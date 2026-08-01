@@ -1,0 +1,40 @@
+[workspace]
+resolver = "2"
+members = ["core"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.1"
+readme = "README.md"
+rust-version = "1.85.0"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/frozen-lab/ashwa"
+keywords = ["ashwa", "memmem", "substring", "find", "search"]
+categories = ["algorithms", "hardware-support", "no-std::no-alloc"]
+description = "Hardware accelerated routines for single substring search"
+
+[workspace.package.metadata.docs.rs]
+default-target = "x86_64-unknown-linux-gnu"
+additional-targets = ["i686-apple-darwin"]
+targets = [
+    "aarch64-apple-darwin",
+    "i686-pc-windows-msvc",
+    "x86_64-pc-windows-msvc",
+    "aarch64-unknown-linux-gnu",
+]
+
+[profile.release]
+lto = "fat"
+opt-level = 3
+codegen-units = 1
+incremental = false
+
+[profile.profile]
+debug = true
+lto = "off"
+strip = "none"
+opt-level = 2
+codegen-units = 1
+inherits = "release"
+overflow-checks = false
+debug-assertions = false

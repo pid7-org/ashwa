@@ -1,0 +1,11 @@
+[package]
+name = "ashwa"
+readme = { workspace = true }
+edition = { workspace = true }
+version = { workspace = true }
+license = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+repository = { workspace = true }
+description = { workspace = true }
+rust-version = { workspace = true }
