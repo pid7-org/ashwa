@@ -1,6 +1,6 @@
 //! Hardware accelerated routines for single substring search
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 #[cfg(not(any(target_pointer_width = "64", target_endian = "little")))]
 compile_error!("ashwa is only supported on 64-bit targets");
