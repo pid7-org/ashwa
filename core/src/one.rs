@@ -1,25 +1,25 @@
 use core::ptr;
 
-#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+#[cfg(target_pointer_width = "64")]
 const LSB64: u64 = 0x0101_0101_0101_0101;
 
-#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+#[cfg(target_pointer_width = "64")]
 const MSB64: u64 = 0x8080_8080_8080_8080;
 
-#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+#[cfg(target_pointer_width = "32")]
 const LSB32: u32 = 0x0101_0101;
 
-#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+#[cfg(target_pointer_width = "32")]
 const MSB32: u32 = 0x8080_8080;
 
-#[cfg(all(target_pointer_width = "16", target_endian = "little"))]
+#[cfg(target_pointer_width = "16")]
 const LSB16: u16 = 0x0101;
 
-#[cfg(all(target_pointer_width = "16", target_endian = "little"))]
+#[cfg(target_pointer_width = "16")]
 const MSB16: u16 = 0x8080;
 
 #[inline(always)]
-#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+#[cfg(target_pointer_width = "64")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_qword = (needle as u64).wrapping_mul(LSB64);
 
@@ -40,18 +40,18 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
         if (m1 | m2 | m3 | m4) != 0 {
             if m1 != 0 {
-                return Some(i + (m1.trailing_zeros() / 8) as usize);
+                return Some(i + get_match_index_64(m1));
             }
 
             if m2 != 0 {
-                return Some(i + 8 + (m2.trailing_zeros() / 8) as usize);
+                return Some(i + 8 + get_match_index_64(m2));
             }
 
             if m3 != 0 {
-                return Some(i + 0x10 + (m3.trailing_zeros() / 8) as usize);
+                return Some(i + 0x10 + get_match_index_64(m3));
             }
 
-            return Some(i + 0x18 + (m4.trailing_zeros() / 8) as usize);
+            return Some(i + 0x18 + get_match_index_64(m4));
         }
 
         i += 0x20;
@@ -66,10 +66,10 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
         if (m1 | m2) != 0 {
             if m1 != 0 {
-                return Some(i + (m1.trailing_zeros() / 8) as usize);
+                return Some(i + get_match_index_64(m1));
             }
 
-            return Some(i + 8 + (m2.trailing_zeros() / 8) as usize);
+            return Some(i + 8 + get_match_index_64(m2));
         }
 
         i += 0x10;
@@ -80,7 +80,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         let m1 = match_qword(w1, needle_qword);
 
         if m1 != 0 {
-            return Some(i + (m1.trailing_zeros() / 8) as usize);
+            return Some(i + get_match_index_64(m1));
         }
 
         i += 8;
@@ -90,7 +90,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline(always)]
-#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+#[cfg(target_pointer_width = "32")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_word = (needle as u32).wrapping_mul(LSB32);
 
@@ -107,10 +107,10 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
         if (m1 | m2) != 0 {
             if m1 != 0 {
-                return Some(i + (m1.trailing_zeros() / 8) as usize);
+                return Some(i + get_match_index_32(m1));
             }
 
-            return Some(i + 4 + (m2.trailing_zeros() / 8) as usize);
+            return Some(i + 4 + get_match_index_32(m2));
         }
 
         i += 8;
@@ -121,7 +121,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         let m1 = match_dword(w1, needle_word);
 
         if m1 != 0 {
-            return Some(i + (m1.trailing_zeros() / 8) as usize);
+            return Some(i + get_match_index_32(m1));
         }
 
         i += 4;
@@ -131,7 +131,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline(always)]
-#[cfg(all(target_pointer_width = "16", target_endian = "little"))]
+#[cfg(target_pointer_width = "16")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_word = (needle as u16).wrapping_mul(LSB16);
 
@@ -148,10 +148,10 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
         if (m1 | m2) != 0 {
             if m1 != 0 {
-                return Some(i + (m1.trailing_zeros() / 8) as usize);
+                return Some(i + get_match_index_16(m1));
             }
 
-            return Some(i + 2 + (m2.trailing_zeros() / 8) as usize);
+            return Some(i + 2 + get_match_index_16(m2));
         }
 
         i += 4;
@@ -162,7 +162,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         let m1 = match_word(w1, needle_word);
 
         if m1 != 0 {
-            return Some(i + (m1.trailing_zeros() / 8) as usize);
+            return Some(i + get_match_index_16(m1));
         }
 
         i += 2;
@@ -172,16 +172,14 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline]
-#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+#[cfg(target_pointer_width = "64")]
 fn match_qword(haystack_qword: u64, needle_qword: u64) -> u64 {
     let x = haystack_qword ^ needle_qword;
-    let m = x.wrapping_sub(LSB64) & !x & MSB64;
-
-    m
+    x.wrapping_sub(LSB64) & !x & MSB64
 }
 
 #[inline]
-#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+#[cfg(target_pointer_width = "32")]
 fn match_dword(haystack_dword: u32, needle_dword: u32) -> u32 {
     let x = haystack_dword ^ needle_dword;
     let m = x.wrapping_sub(LSB32) & !x & MSB32;
@@ -190,12 +188,54 @@ fn match_dword(haystack_dword: u32, needle_dword: u32) -> u32 {
 }
 
 #[inline]
-#[cfg(all(target_pointer_width = "16", target_endian = "little"))]
+#[cfg(target_pointer_width = "16")]
 fn match_word(haystack_word: u16, needle_word: u16) -> u16 {
     let x = haystack_word ^ needle_word;
     let m = x.wrapping_sub(LSB16) & !x & MSB16;
 
     m
+}
+
+#[inline(always)]
+#[cfg(target_pointer_width = "64")]
+fn get_match_index_64(m: u64) -> usize {
+    #[cfg(target_endian = "little")]
+    {
+        (m.trailing_zeros() / 8) as usize
+    }
+
+    #[cfg(target_endian = "big")]
+    {
+        (m.leading_zeros() / 8) as usize
+    }
+}
+
+#[inline(always)]
+#[cfg(target_pointer_width = "32")]
+fn get_match_index_32(m: u32) -> usize {
+    #[cfg(target_endian = "little")]
+    {
+        (m.trailing_zeros() / 8) as usize
+    }
+
+    #[cfg(target_endian = "big")]
+    {
+        (m.leading_zeros() / 8) as usize
+    }
+}
+
+#[inline(always)]
+#[cfg(target_pointer_width = "16")]
+fn get_match_index_16(m: u16) -> usize {
+    #[cfg(target_endian = "little")]
+    {
+        (m.trailing_zeros() / 8) as usize
+    }
+
+    #[cfg(target_endian = "big")]
+    {
+        (m.leading_zeros() / 8) as usize
+    }
 }
 
 #[cfg(test)]
