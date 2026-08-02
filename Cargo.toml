@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["core"]
+default-members = ["core"]
 
 [workspace.package]
 edition = "2024"
@@ -28,3 +29,6 @@ codegen-units = 1
 inherits = "release"
 overflow-checks = false
 debug-assertions = false
+
+[workspace.dependencies]
+criterion = "0.8.2"

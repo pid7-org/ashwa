@@ -11,7 +11,7 @@ repository = { workspace = true }
 description = { workspace = true }
 rust-version = { workspace = true }
 
-[workspace.package.metadata.docs.rs]
+[package.metadata.docs.rs]
 default-target = "x86_64-unknown-linux-gnu"
 additional-targets = ["i686-apple-darwin"]
 targets = [
@@ -20,3 +20,10 @@ targets = [
     "x86_64-pc-windows-msvc",
     "aarch64-unknown-linux-gnu",
 ]
+
+[dev-dependencies]
+criterion = {workspace = true}
+
+[[bench]]
+name = "one_throughput"
+harness = false

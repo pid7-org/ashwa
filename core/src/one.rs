@@ -14,27 +14,30 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     while i + 0x20 <= len {
         let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
-        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
-
         let m1 = match_64(w1, needle_word);
-        if m1 != 0 {
-            return Some(i + (m1.trailing_zeros() / 8) as usize);
-        }
 
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
         let m2 = match_64(w2, needle_word);
-        if m2 != 0 {
-            return Some(i + 8 + (m2.trailing_zeros() / 8) as usize);
-        }
 
+        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
         let m3 = match_64(w3, needle_word);
-        if m3 != 0 {
-            return Some(i + 0x10 + (m3.trailing_zeros() / 8) as usize);
-        }
 
+        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
         let m4 = match_64(w4, needle_word);
-        if m4 != 0 {
+
+        if (m1 | m2 | m3 | m4) != 0 {
+            if m1 != 0 {
+                return Some(i + (m1.trailing_zeros() / 8) as usize);
+            }
+
+            if m2 != 0 {
+                return Some(i + 8 + (m2.trailing_zeros() / 8) as usize);
+            }
+
+            if m3 != 0 {
+                return Some(i + 0x10 + (m3.trailing_zeros() / 8) as usize);
+            }
+
             return Some(i + 0x18 + (m4.trailing_zeros() / 8) as usize);
         }
 
@@ -43,15 +46,16 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     if i + 0x10 <= len {
         let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-
         let m1 = match_64(w1, needle_word);
-        if m1 != 0 {
-            return Some(i + (m1.trailing_zeros() / 8) as usize);
-        }
 
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
         let m2 = match_64(w2, needle_word);
-        if m2 != 0 {
+
+        if (m1 | m2) != 0 {
+            if m1 != 0 {
+                return Some(i + (m1.trailing_zeros() / 8) as usize);
+            }
+
             return Some(i + 8 + (m2.trailing_zeros() / 8) as usize);
         }
 
@@ -69,10 +73,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         i += 8;
     }
 
-    haystack[i..]
-        .iter()
-        .position(|&b| b == needle)
-        .map(|pos| pos + i)
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
 #[inline]
