@@ -1,14 +1,10 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Hardware accelerated routines for single substring search
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+#![no_std]
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+#[cfg(not(any(target_pointer_width = "64", target_endian = "little")))]
+compile_error!("ashwa is only supported on 64-bit targets");
+
+mod one;
+
+pub use one::search_one;
