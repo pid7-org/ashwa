@@ -1,12 +1,21 @@
 use core::ptr;
 
-const LSB: u64 = 0x0101_0101_0101_0101;
-const MSB: u64 = 0x8080_8080_8080_8080;
+#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+const LSB64: u64 = 0x0101_0101_0101_0101;
+
+#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+const MSB64: u64 = 0x8080_8080_8080_8080;
+
+#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+const LSB32: u32 = 0x0101_0101;
+
+#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+const MSB32: u32 = 0x8080_8080;
 
 #[inline(always)]
 #[cfg(all(target_pointer_width = "64", target_endian = "little"))]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
-    let needle_word = (needle as u64).wrapping_mul(LSB);
+    let needle_qword = (needle as u64).wrapping_mul(LSB64);
 
     let mut i = 0;
     let len = haystack.len();
@@ -14,16 +23,14 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     while i + 0x20 <= len {
         let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let m1 = match_64(w1, needle_word);
-
         let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-        let m2 = match_64(w2, needle_word);
-
         let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
-        let m3 = match_64(w3, needle_word);
-
         let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
-        let m4 = match_64(w4, needle_word);
+
+        let m1 = match_qword(w1, needle_qword);
+        let m2 = match_qword(w2, needle_qword);
+        let m3 = match_qword(w3, needle_qword);
+        let m4 = match_qword(w4, needle_qword);
 
         if (m1 | m2 | m3 | m4) != 0 {
             if m1 != 0 {
@@ -46,10 +53,10 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     if i + 0x10 <= len {
         let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let m1 = match_64(w1, needle_word);
-
         let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-        let m2 = match_64(w2, needle_word);
+
+        let m1 = match_qword(w1, needle_qword);
+        let m2 = match_qword(w2, needle_qword);
 
         if (m1 | m2) != 0 {
             if m1 != 0 {
@@ -64,7 +71,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     if i + 8 <= len {
         let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let m1 = match_64(w1, needle_word);
+        let m1 = match_qword(w1, needle_qword);
 
         if m1 != 0 {
             return Some(i + (m1.trailing_zeros() / 8) as usize);
@@ -76,10 +83,61 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
+#[inline(always)]
+#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
+    let needle_word = (needle as u32).wrapping_mul(LSB32);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 8 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 4) as *const u32) };
+
+        let m1 = match_dword(w1, needle_word);
+        let m2 = match_dword(w2, needle_word);
+
+        if (m1 | m2) != 0 {
+            if m1 != 0 {
+                return Some(i + (m1.trailing_zeros() / 8) as usize);
+            }
+
+            return Some(i + 4 + (m2.trailing_zeros() / 8) as usize);
+        }
+
+        i += 8;
+    }
+
+    if i + 4 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
+        let m1 = match_dword(w1, needle_word);
+
+        if m1 != 0 {
+            return Some(i + (m1.trailing_zeros() / 8) as usize);
+        }
+
+        i += 4;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
 #[inline]
-fn match_64(haystack_word: u64, needle_word: u64) -> u64 {
-    let x = haystack_word ^ needle_word;
-    let m = x.wrapping_sub(LSB) & !x & MSB;
+#[cfg(all(target_pointer_width = "64", target_endian = "little"))]
+fn match_qword(haystack_qword: u64, needle_qword: u64) -> u64 {
+    let x = haystack_qword ^ needle_qword;
+    let m = x.wrapping_sub(LSB64) & !x & MSB64;
+
+    m
+}
+
+#[inline]
+#[cfg(all(target_pointer_width = "32", target_endian = "little"))]
+fn match_dword(haystack_dword: u32, needle_dword: u32) -> u32 {
+    let x = haystack_dword ^ needle_dword;
+    let m = x.wrapping_sub(LSB32) & !x & MSB32;
 
     m
 }
