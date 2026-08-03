@@ -28,7 +28,14 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     match crate::get_cpu_feature() {
         1 => search_one_swar(haystack, needle),
         2 | 3 | 4 => unsafe { search_one_sse2(haystack, needle) },
-        5 | 6 => unsafe { search_one_avx2(haystack, needle) },
+        5 => unsafe { search_one_avx2(haystack, needle) },
+        6 => {
+            #[cfg(not(target_feature = "avx512bw"))]
+            return unsafe { search_one_avx2(haystack, needle) };
+
+            #[cfg(target_feature = "avx512bw")]
+            return unsafe { search_one_avx512(haystack, needle) };
+        }
         _ => unreachable!(),
     }
 
@@ -358,6 +365,48 @@ unsafe fn search_one_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
         }
 
         i += 0x10;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[cfg(target_feature = "avx512bw")]
+#[target_feature(enable = "avx512bw")]
+unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
+    let v_needle = _mm512_set1_epi8(needle as i8);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x80 <= len {
+        let v1 = _mm512_loadu_si512(ptr.add(i) as *const _);
+        let v2 = _mm512_loadu_si512(ptr.add(i + 0x40) as *const _);
+
+        let eq1 = _mm512_cmpeq_epi8_mask(v1, v_needle);
+        let eq2 = _mm512_cmpeq_epi8_mask(v2, v_needle);
+
+        if eq1 != 0 {
+            return Some(i + eq1.trailing_zeros() as usize);
+        }
+
+        if eq2 != 0 {
+            return Some(i + 0x40 + eq2.trailing_zeros() as usize);
+        }
+
+        i += 0x80;
+    }
+
+    if i + 0x40 <= len {
+        let v = _mm512_loadu_si512(ptr.add(i) as *const _);
+        let eq = _mm512_cmpeq_epi8_mask(v, v_needle);
+
+        if eq != 0 {
+            return Some(i + eq.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
     }
 
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
