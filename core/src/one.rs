@@ -1,5 +1,8 @@
 use core::ptr;
 
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::*;
+
 #[cfg(target_pointer_width = "64")]
 const LSB64: u64 = 0x0101_0101_0101_0101;
 
@@ -21,72 +24,16 @@ const MSB16: u16 = 0x8080;
 #[inline(always)]
 #[cfg(target_pointer_width = "64")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
-    let needle_qword = (needle as u64).wrapping_mul(LSB64);
-
-    let mut i = 0;
-    let len = haystack.len();
-    let ptr = haystack.as_ptr();
-
-    while i + 0x20 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
-        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
-
-        let m1 = match_qword(w1, needle_qword);
-        let m2 = match_qword(w2, needle_qword);
-        let m3 = match_qword(w3, needle_qword);
-        let m4 = match_qword(w4, needle_qword);
-
-        if (m1 | m2 | m3 | m4) != 0 {
-            if m1 != 0 {
-                return Some(i + get_match_index_64(m1));
-            }
-
-            if m2 != 0 {
-                return Some(i + 8 + get_match_index_64(m2));
-            }
-
-            if m3 != 0 {
-                return Some(i + 0x10 + get_match_index_64(m3));
-            }
-
-            return Some(i + 0x18 + get_match_index_64(m4));
-        }
-
-        i += 0x20;
+    #[cfg(target_arch = "x86_64")]
+    match crate::get_cpu_feature() {
+        1 => search_one_swar(haystack, needle),
+        2 => todo!(),
+        5 => unsafe { search_one_avx2(haystack, needle) },
+        _ => unreachable!(),
     }
 
-    if i + 0x10 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-
-        let m1 = match_qword(w1, needle_qword);
-        let m2 = match_qword(w2, needle_qword);
-
-        if (m1 | m2) != 0 {
-            if m1 != 0 {
-                return Some(i + get_match_index_64(m1));
-            }
-
-            return Some(i + 8 + get_match_index_64(m2));
-        }
-
-        i += 0x10;
-    }
-
-    if i + 8 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let m1 = match_qword(w1, needle_qword);
-
-        if m1 != 0 {
-            return Some(i + get_match_index_64(m1));
-        }
-
-        i += 8;
-    }
-
-    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+    #[cfg(target_arch = "aarch64")]
+    search_one_swar(haystack, needle)
 }
 
 #[inline(always)]
@@ -236,6 +183,122 @@ fn get_match_index_16(m: u16) -> usize {
     {
         (m.leading_zeros() / 8) as usize
     }
+}
+
+#[inline(always)]
+#[cfg(target_pointer_width = "64")]
+fn search_one_swar(haystack: &[u8], needle: u8) -> Option<usize> {
+    let needle_qword = (needle as u64).wrapping_mul(LSB64);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x20 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
+        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
+        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
+
+        let m1 = match_qword(w1, needle_qword);
+        let m2 = match_qword(w2, needle_qword);
+        let m3 = match_qword(w3, needle_qword);
+        let m4 = match_qword(w4, needle_qword);
+
+        if (m1 | m2 | m3 | m4) != 0 {
+            if m1 != 0 {
+                return Some(i + get_match_index_64(m1));
+            }
+
+            if m2 != 0 {
+                return Some(i + 8 + get_match_index_64(m2));
+            }
+
+            if m3 != 0 {
+                return Some(i + 0x10 + get_match_index_64(m3));
+            }
+
+            return Some(i + 0x18 + get_match_index_64(m4));
+        }
+
+        i += 0x20;
+    }
+
+    if i + 0x10 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
+
+        let m1 = match_qword(w1, needle_qword);
+        let m2 = match_qword(w2, needle_qword);
+
+        if (m1 | m2) != 0 {
+            if m1 != 0 {
+                return Some(i + get_match_index_64(m1));
+            }
+
+            return Some(i + 8 + get_match_index_64(m2));
+        }
+
+        i += 0x10;
+    }
+
+    if i + 8 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
+        let m1 = match_qword(w1, needle_qword);
+
+        if m1 != 0 {
+            return Some(i + get_match_index_64(m1));
+        }
+
+        i += 8;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn search_one_avx2(haystack: &[u8], needle: u8) -> Option<usize> {
+    let v_needle = _mm256_set1_epi8(needle as i8);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x40 <= len {
+        let v1 = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v2 = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+
+        let eq1 = _mm256_cmpeq_epi8(v1, v_needle);
+        let eq2 = _mm256_cmpeq_epi8(v2, v_needle);
+
+        let or_vec = _mm256_or_si256(eq1, eq2);
+        if _mm256_movemask_epi8(or_vec) != 0 {
+            let m1 = _mm256_movemask_epi8(eq1);
+            if m1 != 0 {
+                return Some(i + m1.trailing_zeros() as usize);
+            }
+
+            let m2 = _mm256_movemask_epi8(eq2);
+            return Some(i + 0x20 + m2.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
+    }
+
+    if i + 0x20 <= len {
+        let v = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let eq = _mm256_cmpeq_epi8(v, v_needle);
+        let m = _mm256_movemask_epi8(eq);
+
+        if m != 0 {
+            return Some(i + m.trailing_zeros() as usize);
+        }
+
+        i += 0x20;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
 #[cfg(test)]

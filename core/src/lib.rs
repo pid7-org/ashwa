@@ -1,6 +1,7 @@
 //! Hardware accelerated routines for single substring search
 
 #![cfg_attr(not(test), no_std)]
+#![allow(unsafe_op_in_unsafe_fn)]
 
 #[cfg(not(any(
     target_pointer_width = "64",
@@ -49,7 +50,6 @@ pub(crate) fn get_cpu_feature() -> u8 {
 #[cold]
 #[inline(never)]
 #[cfg(target_arch = "x86_64")]
-#[allow(unsafe_op_in_unsafe_fn)]
 unsafe fn detect_features_x86_64() -> u8 {
     let cpuid1 = x86_64::__cpuid(1);
 
