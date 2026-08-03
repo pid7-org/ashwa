@@ -27,8 +27,8 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
     match crate::get_cpu_feature() {
         1 => search_one_swar(haystack, needle),
-        2 => todo!(),
-        5 => unsafe { search_one_avx2(haystack, needle) },
+        2 | 3 | 4 => unsafe { search_one_sse2(haystack, needle) },
+        5 | 6 => unsafe { search_one_avx2(haystack, needle) },
         _ => unreachable!(),
     }
 
@@ -296,6 +296,68 @@ unsafe fn search_one_avx2(haystack: &[u8], needle: u8) -> Option<usize> {
         }
 
         i += 0x20;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sse2")]
+unsafe fn search_one_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
+    let v_needle = _mm_set1_epi8(needle as i8);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x40 <= len {
+        let v1 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v2 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v3 = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v4 = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+
+        let eq1 = _mm_cmpeq_epi8(v1, v_needle);
+        let eq2 = _mm_cmpeq_epi8(v2, v_needle);
+        let eq3 = _mm_cmpeq_epi8(v3, v_needle);
+        let eq4 = _mm_cmpeq_epi8(v4, v_needle);
+
+        let or1 = _mm_or_si128(eq1, eq2);
+        let or2 = _mm_or_si128(eq3, eq4);
+        let or_vec = _mm_or_si128(or1, or2);
+
+        if _mm_movemask_epi8(or_vec) != 0 {
+            let m1 = _mm_movemask_epi8(eq1);
+            if m1 != 0 {
+                return Some(i + m1.trailing_zeros() as usize);
+            }
+
+            let m2 = _mm_movemask_epi8(eq2);
+            if m2 != 0 {
+                return Some(i + 0x10 + m2.trailing_zeros() as usize);
+            }
+
+            let m3 = _mm_movemask_epi8(eq3);
+            if m3 != 0 {
+                return Some(i + 0x20 + m3.trailing_zeros() as usize);
+            }
+
+            let m4 = _mm_movemask_epi8(eq4);
+            return Some(i + 0x30 + m4.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 <= len {
+        let v = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let eq = _mm_cmpeq_epi8(v, v_needle);
+        let m = _mm_movemask_epi8(eq);
+
+        if m != 0 {
+            return Some(i + m.trailing_zeros() as usize);
+        }
+
+        i += 0x10;
     }
 
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)

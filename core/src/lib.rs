@@ -2,6 +2,7 @@
 
 #![cfg_attr(not(test), no_std)]
 #![allow(unsafe_op_in_unsafe_fn)]
+#![allow(unused)]
 
 #[cfg(not(any(
     target_pointer_width = "64",
