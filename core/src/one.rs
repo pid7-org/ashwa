@@ -3,6 +3,9 @@ use core::ptr;
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
+#[cfg(target_arch = "aarch64")]
+use core::arch::aarch64::*;
+
 #[cfg(target_pointer_width = "64")]
 const LSB64: u64 = 0x0101_0101_0101_0101;
 
@@ -26,7 +29,7 @@ const MSB16: u16 = 0x8080;
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
     match crate::get_cpu_feature() {
-        1 => search_one_swar(haystack, needle),
+        1 => search_one_swar64(haystack, needle),
         2 | 3 | 4 => unsafe { search_one_sse2(haystack, needle) },
         5 => unsafe { search_one_avx2(haystack, needle) },
         6 => {
@@ -40,7 +43,9 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     }
 
     #[cfg(target_arch = "aarch64")]
-    search_one_swar(haystack, needle)
+    unsafe {
+        search_one_neon(haystack, needle)
+    }
 }
 
 #[inline(always)]
@@ -193,8 +198,8 @@ fn get_match_index_16(m: u16) -> usize {
 }
 
 #[inline(always)]
-#[cfg(target_pointer_width = "64")]
-fn search_one_swar(haystack: &[u8], needle: u8) -> Option<usize> {
+#[cfg(target_arch = "x86_64")]
+fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_qword = (needle as u64).wrapping_mul(LSB64);
 
     let mut i = 0;
@@ -410,6 +415,77 @@ unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
     }
 
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
+unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
+    let v_needle = vdupq_n_u8(needle);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x40 <= len {
+        let v1 = vld1q_u8(ptr.add(i));
+        let v2 = vld1q_u8(ptr.add(i + 0x10));
+        let v3 = vld1q_u8(ptr.add(i + 0x20));
+        let v4 = vld1q_u8(ptr.add(i + 0x30));
+
+        let eq1 = vceqq_u8(v1, v_needle);
+        let eq2 = vceqq_u8(v2, v_needle);
+        let eq3 = vceqq_u8(v3, v_needle);
+        let eq4 = vceqq_u8(v4, v_needle);
+
+        let or1 = vorrq_u8(eq1, eq2);
+        let or2 = vorrq_u8(eq3, eq4);
+        let or_vec = vorrq_u8(or1, or2);
+
+        if vmaxvq_u32(vreinterpretq_u32_u8(or_vec)) != 0 {
+            if vmaxvq_u32(vreinterpretq_u32_u8(eq1)) != 0 {
+                return Some(i + get_match_index_neon(eq1));
+            }
+
+            if vmaxvq_u32(vreinterpretq_u32_u8(eq2)) != 0 {
+                return Some(i + 0x10 + get_match_index_neon(eq2));
+            }
+
+            if vmaxvq_u32(vreinterpretq_u32_u8(eq3)) != 0 {
+                return Some(i + 0x20 + get_match_index_neon(eq3));
+            }
+
+            return Some(i + 0x30 + get_match_index_neon(eq4));
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 <= len {
+        let v = vld1q_u8(ptr.add(i));
+        let eq = vceqq_u8(v, v_needle);
+
+        if vmaxvq_u32(vreinterpretq_u32_u8(eq)) != 0 {
+            return Some(i + get_match_index_neon(eq));
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
+    let eq_u64 = vreinterpretq_u64_u8(eq);
+    let lane0 = vgetq_lane_u64(eq_u64, 0);
+
+    if lane0 != 0 {
+        (lane0.trailing_zeros() / 8) as usize
+    } else {
+        let lane1 = vgetq_lane_u64(eq_u64, 1);
+        8 + (lane1.trailing_zeros() / 8) as usize
+    }
 }
 
 #[cfg(test)]
