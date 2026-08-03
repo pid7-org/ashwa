@@ -43,8 +43,16 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     }
 
     #[cfg(target_arch = "aarch64")]
-    unsafe {
-        search_one_neon(haystack, needle)
+    {
+        #[cfg(target_feature = "sve")]
+        unsafe {
+            search_one_sve(haystack, needle)
+        }
+
+        #[cfg(not(target_feature = "sve"))]
+        unsafe {
+            search_one_neon(haystack, needle)
+        }
     }
 }
 
@@ -486,6 +494,51 @@ unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
         let lane1 = vgetq_lane_u64(eq_u64, 1);
         8 + (lane1.trailing_zeros() / 8) as usize
     }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "sve")]
+unsafe fn search_one_sve(haystack: &[u8], needle: u8) -> Option<usize> {
+    let ptr = haystack.as_ptr();
+    let len = haystack.len();
+
+    let mut i: usize = 0;
+    let mut res: isize = -1;
+    let mut cnt: usize;
+
+    core::arch::asm!(
+        "dup z0.b, {needle:w}",
+        "1:",
+        "whilelo p0.b, {i}, {len}",
+        "b.none 3f",
+        "ld1b z1.b, p0/z, [{ptr}, {i}]",
+        "cmpeq p1.b, p0/z, z1.b, z0.b",
+        "b.any 2f",
+        "incb {i}",
+        "b 1b",
+        "2:",
+        "brkb p2.b, p0/z, p1.b",
+        "cntp {cnt}, p0, p2.b",
+        "add {res}, {i}, {cnt}",
+        "3:",
+        i = inout(reg) i,
+        len = in(reg) len,
+        ptr = in(reg) ptr,
+        needle = in(reg) needle,
+        cnt = out(reg) cnt,
+        res = inout(reg) res,
+
+        out("z0") _, out("z1") _,
+        out("p0") _, out("p1") _, out("p2") _,
+
+        options(readonly, nostack)
+    );
+
+    if res < 0 {
+        return None;
+    }
+
+    Some(res as usize)
 }
 
 #[cfg(test)]
