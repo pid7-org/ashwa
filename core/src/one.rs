@@ -1,15 +1,16 @@
+#[cfg(target_arch = "x86_64")]
 use core::ptr;
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", not(target_feature = "sve")))]
 use core::arch::aarch64::*;
 
-#[cfg(target_pointer_width = "64")]
+#[cfg(target_arch = "x86_64")]
 const LSB64: u64 = 0x0101_0101_0101_0101;
 
-#[cfg(target_pointer_width = "64")]
+#[cfg(target_arch = "x86_64")]
 const MSB64: u64 = 0x8080_8080_8080_8080;
 
 #[cfg(target_pointer_width = "32")]
@@ -139,7 +140,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline]
-#[cfg(target_pointer_width = "64")]
+#[cfg(target_arch = "x86_64")]
 fn match_qword(haystack_qword: u64, needle_qword: u64) -> u64 {
     let x = haystack_qword ^ needle_qword;
     x.wrapping_sub(LSB64) & !x & MSB64
@@ -164,7 +165,7 @@ fn match_word(haystack_word: u16, needle_word: u16) -> u16 {
 }
 
 #[inline(always)]
-#[cfg(target_pointer_width = "64")]
+#[cfg(target_arch = "x86_64")]
 fn get_match_index_64(m: u64) -> usize {
     #[cfg(target_endian = "little")]
     {
@@ -427,6 +428,7 @@ unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
 
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
+#[cfg(not(target_feature = "sve"))]
 unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
     let v_needle = vdupq_n_u8(needle);
 
@@ -484,19 +486,21 @@ unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
 
 #[inline(always)]
 #[cfg(target_arch = "aarch64")]
+#[cfg(not(target_feature = "sve"))]
 unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
     let eq_u64 = vreinterpretq_u64_u8(eq);
     let lane0 = vgetq_lane_u64(eq_u64, 0);
 
     if lane0 != 0 {
-        (lane0.trailing_zeros() / 8) as usize
-    } else {
-        let lane1 = vgetq_lane_u64(eq_u64, 1);
-        8 + (lane1.trailing_zeros() / 8) as usize
+        return (lane0.trailing_zeros() / 8) as usize;
     }
+
+    let lane1 = vgetq_lane_u64(eq_u64, 1);
+    8 + (lane1.trailing_zeros() / 8) as usize
 }
 
 #[cfg(target_arch = "aarch64")]
+#[cfg(target_feature = "sve")]
 #[target_feature(enable = "sve")]
 unsafe fn search_one_sve(haystack: &[u8], needle: u8) -> Option<usize> {
     let ptr = haystack.as_ptr();
@@ -504,41 +508,38 @@ unsafe fn search_one_sve(haystack: &[u8], needle: u8) -> Option<usize> {
 
     let mut i: usize = 0;
     let mut res: isize = -1;
-    let mut cnt: usize;
 
     core::arch::asm!(
         "dup z0.b, {needle:w}",
-        "1:",
+        "2:",
         "whilelo p0.b, {i}, {len}",
-        "b.none 3f",
+        "b.none 4f",
         "ld1b z1.b, p0/z, [{ptr}, {i}]",
         "cmpeq p1.b, p0/z, z1.b, z0.b",
-        "b.any 2f",
+        "b.any 3f",
         "incb {i}",
-        "b 1b",
-        "2:",
+        "b 2b",
+        "3:",
         "brkb p2.b, p0/z, p1.b",
         "cntp {cnt}, p0, p2.b",
         "add {res}, {i}, {cnt}",
-        "3:",
+        "4:",
         i = inout(reg) i,
         len = in(reg) len,
         ptr = in(reg) ptr,
         needle = in(reg) needle,
-        cnt = out(reg) cnt,
+        cnt = out(reg) _,
         res = inout(reg) res,
-
         out("z0") _, out("z1") _,
         out("p0") _, out("p1") _, out("p2") _,
-
         options(readonly, nostack)
     );
 
     if res < 0 {
-        return None;
+        None
+    } else {
+        Some(res as usize)
     }
-
-    Some(res as usize)
 }
 
 #[cfg(test)]
