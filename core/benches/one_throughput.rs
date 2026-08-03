@@ -4,7 +4,19 @@ use std::hint::black_box;
 
 const KB: usize = 0x400;
 const MB: usize = KB * KB;
-const SIZES: [usize; 8] = [0x40, 0x100, 0x200, 1 * KB, 0x40 * KB, 1 * MB, 0x40 * MB, 0x80 * MB];
+
+const SIZES: [usize; 0x0A] = [
+    0x200,
+    1 * KB,
+    0x20 * KB,
+    0x40 * KB,
+    0x200 * KB,
+    1 * MB,
+    0x20 * MB,
+    0x40 * MB,
+    0x80 * MB,
+    0x200 * MB,
+];
 
 fn bench_throughput(c: &mut Criterion) {
     let mut group = c.benchmark_group("search_one");
