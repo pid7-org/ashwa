@@ -44,9 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-x86-64-stable
@@ -67,9 +69,11 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
+      
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-24.04-arm-aarch64-stable
@@ -85,15 +89,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-i686-stable
-
-      - name: cross setup
-        run: cargo install cross --git https://github.com/cross-rs/cross
+          
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cross
+          git: https://github.com/cross-rs/cross
         
       - name: SWAR
         run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target i686-unknown-linux-gnu -- --nocapture
@@ -106,15 +114,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-armv7-stable
-
-      - name: cross setup
-        run: cargo install cross --git https://github.com/cross-rs/cross
+          
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cross
+          git: https://github.com/cross-rs/cross
         
       - name: SWAR
         run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
@@ -129,18 +141,20 @@ jobs:
       CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime
     steps:
       - uses: actions/checkout@v5
+      
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           target: wasm32-wasip2
-
+          
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-wasm32-stable
 
-      - name: wasm setup
-        run: cargo install wasmtime-cli
-
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: wasmtime-cli
+ 
       - name: SWAR
         run: RUSTFLAGS="--cfg forced_swar_backend" cargo test --target wasm32-wasip2 -- --nocapture
 
