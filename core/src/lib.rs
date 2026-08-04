@@ -3,12 +3,8 @@
 #![cfg_attr(not(test), no_std)]
 #![allow(unsafe_op_in_unsafe_fn)]
 
-#[cfg(not(any(
-    target_pointer_width = "64",
-    target_pointer_width = "32",
-    target_pointer_width = "16"
-)))]
-compile_error!("ashwa is only supported on 64, 32 and 16 bit targets");
+#[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
+compile_error!("ashwa is only supported on 64 and 32 bit targets");
 
 #[cfg(all(target_arch = "x86_64"))]
 use core::{arch::x86_64, sync::atomic};
