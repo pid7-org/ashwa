@@ -1,4 +1,5 @@
-#[allow(unused)]
+#![allow(unused)]
+
 use core::ptr;
 
 #[cfg(target_arch = "x86_64")]
@@ -7,23 +8,21 @@ use core::arch::x86_64::*;
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+#[cfg(target_arch = "wasm32")]
 use core::arch::wasm32::*;
 
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(target_pointer_width = "64")]
 const LSB64: u64 = 0x0101_0101_0101_0101;
 
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(target_pointer_width = "64")]
 const MSB64: u64 = 0x8080_8080_8080_8080;
 
-#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 const LSB32: u32 = 0x0101_0101;
 
-#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 const MSB32: u32 = 0x8080_8080;
 
@@ -56,8 +55,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         #[cfg(forced_swar_backend)]
         return search_one_swar64(haystack, needle);
 
-        #[cfg(not(forced_swar_backend))]
-        return unsafe { search_one_neon(haystack, needle) };
+        unsafe { search_one_neon(haystack, needle) }
     }
 }
 
@@ -68,8 +66,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         #[cfg(target_feature = "simd128")]
         return unsafe { search_one_simd128(haystack, needle) };
 
-        #[cfg(not(target_feature = "simd128"))]
-        return search_one_swar32(haystack, needle);
+        search_one_swar32(haystack, needle)
     }
 
     #[cfg(target_arch = "arm")]
@@ -77,17 +74,15 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         #[cfg(target_feature = "neon")]
         return unsafe { search_one_neon(haystack, needle) };
 
-        #[cfg(not(target_feature = "neon"))]
-        return search_one_swar32(haystack, needle);
+        search_one_swar32(haystack, needle)
     }
 
     #[cfg(target_arch = "x86")]
     {
-        #[cfg(any(not(target_feature = "sse2"), forced_swar_backend))]
-        return search_one_swar32(haystack, needle);
-
         #[cfg(target_feature = "sse2")]
         return unsafe { search_one_sse2(haystack, needle) };
+
+        search_one_swar32(haystack, needle)
     }
 }
 
@@ -140,7 +135,6 @@ fn match_qword(haystack_qword: u64, needle_qword: u64) -> u64 {
 }
 
 #[inline]
-#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 fn match_dword(haystack_dword: u32, needle_dword: u32) -> u32 {
     let x = haystack_dword ^ needle_dword;
@@ -172,7 +166,6 @@ fn get_match_index_64(m: u64) -> usize {
     }
 }
 
-#[allow(unused)]
 #[inline(always)]
 #[cfg(target_pointer_width = "32")]
 fn get_match_index_32(m: u32) -> usize {
@@ -273,7 +266,6 @@ fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline(always)]
-#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 fn search_one_swar32(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_word = (needle as u32).wrapping_mul(LSB32);
@@ -421,9 +413,8 @@ unsafe fn search_one_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
-#[cfg(target_arch = "x86_64")]
-#[cfg(target_feature = "avx512bw")]
 #[target_feature(enable = "avx512bw")]
+#[cfg(all(target_arch = "x86_64", target_feature = "avx512bw"))]
 unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
     let v_needle = _mm512_set1_epi8(needle as i8);
 
@@ -534,7 +525,7 @@ unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
     8 + (lane1.trailing_zeros() / 8) as usize
 }
 
-#[cfg(target_arch = "arm")]
+#[target_feature(enable = "neon")]
 #[cfg(all(target_arch = "arm", target_feature = "neon"))]
 unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
     #[inline(always)]
