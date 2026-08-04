@@ -1,0 +1,81 @@
+name: Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["master"]
+
+permissions:
+  contents: read
+
+jobs:
+  lints:
+    env:
+      RUSTFLAGS: "-D warnings"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            rustflags: "-C target-feature=+avx2,+sse2 --cfg forced_swar_backend"
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+            rustflags: "-C target-feature=+neon --cfg forced_swar_backend"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-${{ runner.os }}-${{ matrix.arch }}-stable
+
+      - name: check (${{ matrix.arch }})
+        run: RUSTFLAGS="${{matrix.rustflags}}" cargo check --workspace --all-targets --all-features --tests --benches --examples
+        
+  x86_64:
+    needs: lints
+    env:
+      RUSTFLAGS: "-D warnings"    
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-latest-x86-64-stable
+
+      - name: SWAR
+        run: RUSTFLAGS="--cfg forced_swar_backend" cargo test -- --nocapture
+
+      - name: SSE2
+        run: RUSTFLAGS="-C target-feature=+sse2" cargo test -- --nocapture
+        
+      - name: AVX2
+        run: RUSTFLAGS="-C target-feature=+avx2" cargo test -- --nocapture
+        
+  aarch64:
+    needs: lints
+    env:
+      RUSTFLAGS: "-D warnings"    
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-24.04-arm-aarch64-stable
+
+      - name: SWAR
+        run: RUSTFLAGS="--cfg forced_swar_backend" cargo test -- --nocapture
+
+      - name: NEON
+        run: RUSTFLAGS="-C target-feature=+neon" cargo test -- --nocapture

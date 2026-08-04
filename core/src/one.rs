@@ -13,10 +13,10 @@ use core::arch::wasm32::*;
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 const LSB64: u64 = 0x0101_0101_0101_0101;
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 const MSB64: u64 = 0x8080_8080_8080_8080;
 
 #[allow(unused)]
@@ -82,11 +82,11 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     #[cfg(target_arch = "x86")]
     {
+        #[cfg(any(not(target_feature = "sse2"), forced_swar_backend))]
+        return search_one_swar32(haystack, needle);
+
         #[cfg(target_feature = "sse2")]
         return unsafe { search_one_sse2(haystack, needle) };
-
-        #[cfg(not(target_feature = "sse2"))]
-        return search_one_swar32(haystack, needle);
     }
 }
 
@@ -132,7 +132,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline]
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn match_qword(haystack_qword: u64, needle_qword: u64) -> u64 {
     let x = haystack_qword ^ needle_qword;
     x.wrapping_sub(LSB64) & !x & MSB64
@@ -158,7 +158,7 @@ fn match_word(haystack_word: u16, needle_word: u16) -> u16 {
 }
 
 #[inline(always)]
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 fn get_match_index_64(m: u64) -> usize {
     #[cfg(target_endian = "little")]
     {
