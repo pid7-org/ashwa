@@ -79,3 +79,70 @@ jobs:
 
       - name: NEON
         run: RUSTFLAGS="-C target-feature=+neon" cargo test -- --nocapture
+
+  x86_32:
+    needs: lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-latest-i686-stable
+
+      - name: cross setup
+        run: cargo install cross --git https://github.com/cross-rs/cross
+        
+      - name: SWAR
+        run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target i686-unknown-linux-gnu -- --nocapture
+        
+      - name: SSE2
+        run: RUSTFLAGS="-C target-feature=+sse2" cross test --target i686-unknown-linux-gnu -- --nocapture
+
+  armv7:
+    needs: lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-latest-armv7-stable
+
+      - name: cross setup
+        run: cargo install cross --git https://github.com/cross-rs/cross
+        
+      - name: SWAR
+        run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
+        
+      - name: NEON
+        run: RUSTFLAGS="-C target-feature=+neon" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
+
+  wasm32:
+    needs: lints
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-latest-wasm32-stable
+
+      - name: wasm setup
+        run: cargo install wasmtime-cli
+
+      - name: SWAR
+        run: RUSTFLAGS="--cfg forced_swar_backend" cargo test --target wasm32-wasip2 -- --nocapture
+
+      - name: SIMD128
+        run: RUSTFLAGS="-C target-feature=+simd128" cargo test --target wasm32-wasip2 -- --nocapture

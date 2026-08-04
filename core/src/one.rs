@@ -56,7 +56,8 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         #[cfg(forced_swar_backend)]
         return search_one_swar64(haystack, needle);
 
-        unsafe { search_one_neon(haystack, needle) }
+        #[cfg(not(forced_swar_backend))]
+        return unsafe { search_one_neon(haystack, needle) };
     }
 }
 
