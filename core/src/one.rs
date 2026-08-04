@@ -598,122 +598,158 @@ unsafe fn search_one_simd128(haystack: &[u8], needle: u8) -> Option<usize> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn ok_empty_haystack() {
-        assert_eq!(search_one(b"", b'a'), None);
-    }
+    fn run_standard_suite(search_fn: impl Fn(&[u8], u8) -> Option<usize>) {
+        assert_eq!(search_fn(b"", b'a'), None);
 
-    #[test]
-    fn ok_needle_not_found() {
         let haystack = b"the quick brown fox jumps over the lazy dog";
+        assert_eq!(search_fn(haystack, b'Z'), None);
+        assert_eq!(search_fn(haystack, b'!'), None);
+        assert_eq!(search_fn(haystack, b'o'), Some(0x0C));
 
-        assert_eq!(search_one(haystack, b'Z'), None);
-        assert_eq!(search_one(haystack, b'!'), None);
-    }
-
-    #[test]
-    fn ok_iter_fallback_for_len_1to8() {
         for len in 1..8 {
             let mut haystack = vec![b'x'; len];
             haystack[len - 1] = b'a';
 
-            assert_eq!(search_one(&haystack, b'a'), Some(len - 1));
+            assert_eq!(search_fn(&haystack, b'a'), Some(len - 1));
         }
-    }
 
-    #[test]
-    fn ok_exact_chunk_boundaries() {
         let mut h8 = [b'-'; 8];
         let mut h16 = [b'-'; 0x10];
         let mut h24 = [b'-'; 0x18];
         let mut h32 = [b'-'; 0x20];
 
         h8[7] = b'A';
-        assert_eq!(search_one(&h8, b'A'), Some(7));
+        assert_eq!(search_fn(&h8, b'A'), Some(7));
 
         h16[0x0F] = b'B';
-        assert_eq!(search_one(&h16, b'B'), Some(0x0F));
+        assert_eq!(search_fn(&h16, b'B'), Some(0x0F));
 
         h24[0x17] = b'C';
-        assert_eq!(search_one(&h24, b'C'), Some(0x17));
+        assert_eq!(search_fn(&h24, b'C'), Some(0x17));
 
         h32[0x1F] = b'D';
-        assert_eq!(search_one(&h32, b'D'), Some(0x1F));
-    }
+        assert_eq!(search_fn(&h32, b'D'), Some(0x1F));
 
-    #[test]
-    fn ok_exhaustive_positions() {
         let mut haystack = vec![b'-'; 0x200];
-
         for i in 0..haystack.len() {
             haystack[i] = b'A';
-
-            assert_eq!(
-                search_one(&haystack, b'A'),
-                Some(i),
-                "Failed finding needle at index {}",
-                i
-            );
+            assert_eq!(search_fn(&haystack, b'A'), Some(i), "Failed finding needle at index {}", i);
 
             haystack[i] = b'-';
         }
-    }
 
-    #[test]
-    fn ok_multiple_occurrences() {
-        let haystack = b"hello world, hello rust";
-        assert_eq!(search_one(haystack, b'o'), Some(4));
-    }
+        let mut haystack_high = vec![0x80; 0x40];
+        haystack_high[0x3F] = 0xFF;
 
-    #[test]
-    fn ok_high_bit_characters() {
-        let mut haystack = vec![0x80; 0x40];
-        haystack[0x3F] = 0xFF;
+        assert_eq!(search_fn(&haystack_high, 0x7F), None);
+        assert_eq!(search_fn(&haystack_high, 0xFF), Some(0x3F));
 
-        assert_eq!(search_one(&haystack, 0x7F), None);
-        assert_eq!(search_one(&haystack, 0xFF), Some(0x3F));
-    }
+        let mut haystack_null = vec![0xFF; 0x50];
+        haystack_null[0x2A] = 0x00;
 
-    #[test]
-    fn ok_null_byte_search() {
-        let mut haystack = vec![0xFF; 0x50];
-        haystack[0x2A] = 0x00;
+        assert_eq!(search_fn(&haystack_null, 0x00), Some(0x2A));
+        assert_eq!(search_fn(b"\x01\x01\x01\x01\x01\x01\x01\x01", 0x01), Some(0));
+        assert_eq!(search_fn(b"\x80\x80\x80\x80\x80\x80\x80\x80", 0x80), Some(0));
 
-        assert_eq!(search_one(&haystack, 0x00), Some(0x2A));
-    }
-
-    #[test]
-    fn ok_unaligned_slice_offsets() {
         let buffer = vec![b'-'; 0x60];
-
         for offset in 1..8 {
             let mut haystack = buffer[offset..].to_vec();
-
             haystack[0x19] = b'Z';
-            assert_eq!(
-                search_one(&haystack, b'Z'),
-                Some(0x19),
-                "Failed at slice offset {}",
-                offset
-            );
+
+            assert_eq!(search_fn(&haystack, b'Z'), Some(0x19));
 
             let end_idx = haystack.len() - 2;
             haystack[end_idx] = b'Y';
+
+            assert_eq!(search_fn(&haystack, b'Y'), Some(end_idx));
+        }
+
+        let tail_lengths = [0x09, 0x0F, 0x11, 0x1F, 0x21, 0x3F, 0x41, 0x7F, 0x81, 0xFF, 0x101];
+        for &len in &tail_lengths {
+            let mut haystack = vec![b'-'; len];
+            haystack[len - 1] = b'A';
+
             assert_eq!(
-                search_one(&haystack, b'Y'),
-                Some(end_idx),
-                "Failed at slice offset {} near the end",
-                offset
+                search_fn(&haystack, b'A'),
+                Some(len - 1),
+                "Failed tail chunk fallback for length {}",
+                len
             );
+        }
+
+        let mut haystack_lanes = vec![b'-'; 0x100];
+        for i in (0..0x100).step_by(16) {
+            haystack_lanes[i] = b'*';
+        }
+
+        assert_eq!(search_fn(&haystack_lanes, b'*'), Some(0));
+
+        haystack_lanes[0] = b'-';
+        assert_eq!(search_fn(&haystack_lanes, b'*'), Some(0x10));
+
+        let mut huge_haystack = vec![b'x'; 0x64 * 0x400];
+        assert_eq!(search_fn(&huge_haystack, b'Z'), None);
+
+        huge_haystack[0x64 * 0x400 - 1] = b'Z';
+        assert_eq!(search_fn(&huge_haystack, b'Z'), Some(0x64 * 0x400 - 1));
+    }
+
+    #[test]
+    fn test_public_api() {
+        run_standard_suite(search_one);
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn test_swar64_directly() {
+        run_standard_suite(search_one_swar64);
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "32")]
+    fn test_swar32_directly() {
+        run_standard_suite(search_one_swar32);
+    }
+
+    #[test]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    fn test_sse2_directly() {
+        if std::is_x86_feature_detected!("sse2") {
+            run_standard_suite(|h, n| unsafe { search_one_sse2(h, n) });
         }
     }
 
     #[test]
-    fn ok_needle_is_lsb_msb_masks() {
-        let haystack_lsb = b"\x01\x01\x01\x01\x01\x01\x01\x01";
-        assert_eq!(search_one(haystack_lsb, 0x01), Some(0));
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_directly() {
+        if std::is_x86_feature_detected!("avx2") {
+            run_standard_suite(|h, n| unsafe { search_one_avx2(h, n) });
+        }
+    }
 
-        let haystack_msb = b"\x80\x80\x80\x80\x80\x80\x80\x80";
-        assert_eq!(search_one(haystack_msb, 0x80), Some(0));
+    #[test]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx512bw"))]
+    fn test_avx512_directly() {
+        if std::is_x86_feature_detected!("avx512bw") {
+            run_standard_suite(|h, n| unsafe { search_one_avx512(h, n) });
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn test_neon_aarch64_directly() {
+        run_standard_suite(|h, n| unsafe { search_one_neon(h, n) });
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "arm", target_feature = "neon"))]
+    fn test_neon_arm32_directly() {
+        run_standard_suite(|h, n| unsafe { search_one_neon(h, n) });
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    fn test_wasm_simd128_directly() {
+        run_standard_suite(|h, n| unsafe { search_one_simd128(h, n) });
     }
 }
