@@ -1,4 +1,4 @@
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[allow(unused)]
 use core::ptr;
 
 #[cfg(target_arch = "x86_64")]
@@ -6,6 +6,9 @@ use core::arch::x86_64::*;
 
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
+
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+use core::arch::wasm32::*;
 
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
@@ -57,21 +60,34 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     }
 }
 
-#[inline(always)]
 #[cfg(target_pointer_width = "32")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
-    #[cfg(all(target_arch = "arm", target_feature = "neon"))]
-    unsafe {
-        search_one_neon(haystack, needle)
+    #[cfg(target_arch = "wasm32")]
+    {
+        #[cfg(target_feature = "simd128")]
+        return unsafe { search_one_simd128(haystack, needle) };
+
+        #[cfg(not(target_feature = "simd128"))]
+        return search_one_swar32(haystack, needle);
     }
 
-    #[cfg(target_feature = "sse2")]
-    unsafe {
-        search_one_sse2(haystack, needle)
+    #[cfg(target_arch = "arm")]
+    {
+        #[cfg(target_feature = "neon")]
+        return unsafe { search_one_neon(haystack, needle) };
+
+        #[cfg(not(target_feature = "neon"))]
+        return search_one_swar32(haystack, needle);
     }
 
-    #[cfg(not(target_feature = "sse2"))]
-    search_one_swar32(haystack, needle)
+    #[cfg(target_arch = "x86")]
+    {
+        #[cfg(target_feature = "sse2")]
+        return unsafe { search_one_sse2(haystack, needle) };
+
+        #[cfg(not(target_feature = "sse2"))]
+        return search_one_swar32(haystack, needle);
+    }
 }
 
 #[inline(always)]
@@ -592,6 +608,68 @@ unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
 
     let lane1 = vgetq_lane_u64(eq_u64, 1);
     8 + (lane1.trailing_zeros() / 8) as usize
+}
+
+#[target_feature(enable = "simd128")]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+unsafe fn search_one_simd128(haystack: &[u8], needle: u8) -> Option<usize> {
+    let v_needle = u8x16_splat(needle);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x40 <= len {
+        let v1 = v128_load(ptr.add(i) as *const v128);
+        let v2 = v128_load(ptr.add(i + 0x10) as *const v128);
+        let v3 = v128_load(ptr.add(i + 0x20) as *const v128);
+        let v4 = v128_load(ptr.add(i + 0x30) as *const v128);
+
+        let eq1 = u8x16_eq(v1, v_needle);
+        let eq2 = u8x16_eq(v2, v_needle);
+        let eq3 = u8x16_eq(v3, v_needle);
+        let eq4 = u8x16_eq(v4, v_needle);
+
+        let or1 = v128_or(eq1, eq2);
+        let or2 = v128_or(eq3, eq4);
+        let or_vec = v128_or(or1, or2);
+
+        if u8x16_bitmask(or_vec) != 0 {
+            let m1 = u8x16_bitmask(eq1);
+            if m1 != 0 {
+                return Some(i + m1.trailing_zeros() as usize);
+            }
+
+            let m2 = u8x16_bitmask(eq2);
+            if m2 != 0 {
+                return Some(i + 0x10 + m2.trailing_zeros() as usize);
+            }
+
+            let m3 = u8x16_bitmask(eq3);
+            if m3 != 0 {
+                return Some(i + 0x20 + m3.trailing_zeros() as usize);
+            }
+
+            let m4 = u8x16_bitmask(eq4);
+            return Some(i + 0x30 + m4.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 <= len {
+        let v = v128_load(ptr.add(i) as *const v128);
+        let eq = u8x16_eq(v, v_needle);
+        let mask = u8x16_bitmask(eq);
+
+        if mask != 0 {
+            return Some(i + mask.trailing_zeros() as usize);
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|p| p + i)
 }
 
 #[cfg(test)]
