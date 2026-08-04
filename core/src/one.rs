@@ -1,8 +1,11 @@
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::ptr;
 
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
+
+#[cfg(target_arch = "x86")]
+use core::arch::x86::*;
 
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
@@ -13,9 +16,11 @@ const LSB64: u64 = 0x0101_0101_0101_0101;
 #[cfg(target_arch = "x86_64")]
 const MSB64: u64 = 0x8080_8080_8080_8080;
 
+#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 const LSB32: u32 = 0x0101_0101;
 
+#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 const MSB32: u32 = 0x8080_8080;
 
@@ -55,42 +60,11 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 #[inline(always)]
 #[cfg(target_pointer_width = "32")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
-    let needle_word = (needle as u32).wrapping_mul(LSB32);
+    #[cfg(target_feature = "sse2")]
+    return unsafe { search_one_sse2(haystack, needle) };
 
-    let mut i = 0;
-    let len = haystack.len();
-    let ptr = haystack.as_ptr();
-
-    while i + 8 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 4) as *const u32) };
-
-        let m1 = match_dword(w1, needle_word);
-        let m2 = match_dword(w2, needle_word);
-
-        if (m1 | m2) != 0 {
-            if m1 != 0 {
-                return Some(i + get_match_index_32(m1));
-            }
-
-            return Some(i + 4 + get_match_index_32(m2));
-        }
-
-        i += 8;
-    }
-
-    if i + 4 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
-        let m1 = match_dword(w1, needle_word);
-
-        if m1 != 0 {
-            return Some(i + get_match_index_32(m1));
-        }
-
-        i += 4;
-    }
-
-    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+    #[cfg(not(target_feature = "sse2"))]
+    search_one_swar32(haystack, needle)
 }
 
 #[inline(always)]
@@ -142,6 +116,7 @@ fn match_qword(haystack_qword: u64, needle_qword: u64) -> u64 {
 }
 
 #[inline]
+#[allow(unused)]
 #[cfg(target_pointer_width = "32")]
 fn match_dword(haystack_dword: u32, needle_dword: u32) -> u32 {
     let x = haystack_dword ^ needle_dword;
@@ -173,6 +148,7 @@ fn get_match_index_64(m: u64) -> usize {
     }
 }
 
+#[allow(unused)]
 #[inline(always)]
 #[cfg(target_pointer_width = "32")]
 fn get_match_index_32(m: u32) -> usize {
@@ -272,6 +248,48 @@ fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
+#[inline(always)]
+#[allow(unused)]
+#[cfg(target_pointer_width = "32")]
+fn search_one_swar32(haystack: &[u8], needle: u8) -> Option<usize> {
+    let needle_word = (needle as u32).wrapping_mul(LSB32);
+
+    let mut i = 0;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 8 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 4) as *const u32) };
+
+        let m1 = match_dword(w1, needle_word);
+        let m2 = match_dword(w2, needle_word);
+
+        if (m1 | m2) != 0 {
+            if m1 != 0 {
+                return Some(i + get_match_index_32(m1));
+            }
+
+            return Some(i + 4 + get_match_index_32(m2));
+        }
+
+        i += 8;
+    }
+
+    if i + 4 <= len {
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
+        let m1 = match_dword(w1, needle_word);
+
+        if m1 != 0 {
+            return Some(i + get_match_index_32(m1));
+        }
+
+        i += 4;
+    }
+
+    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
+}
+
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 unsafe fn search_one_avx2(haystack: &[u8], needle: u8) -> Option<usize> {
@@ -317,8 +335,8 @@ unsafe fn search_one_avx2(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
-#[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 unsafe fn search_one_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
     let v_needle = _mm_set1_epi8(needle as i8);
 
