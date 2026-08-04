@@ -3,6 +3,9 @@
 use core::ptr;
 
 #[cfg(target_arch = "x86_64")]
+use crate::{get_cpu_feature, ISA};
+
+#[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::*;
 
 #[cfg(target_arch = "x86")]
@@ -30,11 +33,11 @@ const MSB32: u32 = 0x8080_8080;
 #[cfg(target_pointer_width = "64")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
-    match crate::get_cpu_feature() {
-        1 => search_one_swar64(haystack, needle),
-        2 | 3 | 4 => unsafe { search_one_sse2(haystack, needle) },
-        5 => unsafe { search_one_avx2(haystack, needle) },
-        6 => {
+    match get_cpu_feature() {
+        ISA::SWAR => search_one_swar64(haystack, needle),
+        ISA::AVX2 => unsafe { search_one_avx2(haystack, needle) },
+        ISA::SSE2 | ISA::SSSE3 | ISA::SSE4_2 => unsafe { search_one_sse2(haystack, needle) },
+        ISA::AVX512BW => {
             #[cfg(not(target_feature = "avx512bw"))]
             return unsafe { search_one_avx2(haystack, needle) };
 
