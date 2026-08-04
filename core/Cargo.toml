@@ -27,3 +27,8 @@ criterion = {workspace = true}
 [[bench]]
 name = "one_throughput"
 harness = false
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(forced_swar_backend)'
+] }

@@ -27,12 +27,32 @@ pub use one::search_one;
 /// * 3: SSSE3
 /// * 4: SSSE4.2
 /// * 5: AVX2
+/// * 6: AVX512
 #[cfg(all(target_arch = "x86_64"))]
 static CPU_FEATURE: atomic::AtomicU8 = atomic::AtomicU8::new(0);
 
 #[inline(always)]
+#[allow(unreachable_code)]
 #[cfg(target_arch = "x86_64")]
 pub(crate) fn get_cpu_feature() -> u8 {
+    #[cfg(forced_swar_backend)]
+    return 1;
+
+    #[cfg(target_feature = "avx512bw")]
+    return 6;
+
+    #[cfg(target_feature = "avx2")]
+    return 5;
+
+    #[cfg(target_feature = "sse4.2")]
+    return 4;
+
+    #[cfg(target_feature = "ssse3")]
+    return 3;
+
+    #[cfg(target_feature = "sse2")]
+    return 2;
+
     let feature = CPU_FEATURE.load(atomic::Ordering::Relaxed);
     if feature != 0 {
         return feature;
@@ -41,8 +61,8 @@ pub(crate) fn get_cpu_feature() -> u8 {
     let detected = unsafe { detect_features_x86_64() };
     CPU_FEATURE.store(detected, atomic::Ordering::Relaxed);
 
-    // sanity check
-    debug_assert!(detected <= 5, "Invalid ID detected for CPU_FEATURE");
+    // sanity checks
+    debug_assert!(detected <= 6, "Invalid ID detected for CPU_FEATURE");
 
     detected
 }
@@ -64,6 +84,18 @@ unsafe fn detect_features_x86_64() -> u8 {
 
         if xmm_ymm_enabled {
             let cpuid7 = x86_64::__cpuid_count(7, 0);
+
+            #[cfg(target_feature = "avx512bw")]
+            {
+                let avx512f_bw = (1 << 16) | (1 << 30);
+                let vbmi_vbmi2 = (1 << 1) | (1 << 6);
+                if (cpuid7.ebx & avx512f_bw) == avx512f_bw
+                    && (cpuid7.ecx & vbmi_vbmi2) == vbmi_vbmi2
+                {
+                    return 6;
+                }
+            }
+
             if (cpuid7.ebx & (1 << 5)) != 0 {
                 return 5;
             }

@@ -45,6 +45,9 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
     #[cfg(target_arch = "aarch64")]
     {
+        #[cfg(forced_swar_backend)]
+        return search_one_swar64(haystack, needle);
+
         unsafe { search_one_neon(haystack, needle) }
     }
 }
@@ -199,7 +202,7 @@ fn get_match_index_16(m: u16) -> usize {
 }
 
 #[inline(always)]
-#[cfg(target_arch = "x86_64")]
+#[cfg(target_pointer_width = "64")]
 fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_qword = (needle as u64).wrapping_mul(LSB64);
 
