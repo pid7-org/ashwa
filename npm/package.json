@@ -1,0 +1,32 @@
+{
+  "name": "@pid7/ashwa",
+  "version": "0.1.1",
+  "description": "Hardware accelerated routines for single substring search",
+  "license": "MIT",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+   "repository": {
+    "type": "git",
+    "url": "http://github.com/pid7/ashwa/"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "require": "./index.js",
+      "default": "./index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "keywords": [
+    "simd",
+    "search",
+    "string",
+    "rust",
+    "wasm",
+    "node"
+  ]
+}

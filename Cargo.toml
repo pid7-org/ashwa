@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core"]
+members = ["core", "node/ashwa_node"]
 default-members = ["core"]
 
 [workspace.package]
