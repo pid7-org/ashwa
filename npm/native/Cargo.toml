@@ -1,0 +1,23 @@
+[package]
+name = "ashwa_node"
+publish = false
+edition.workspace = true
+version.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ashwa = {path = "../../core"}
+napi = "3"
+napi-derive = "3"
+
+[build-dependencies]
+napi-build = "2"
