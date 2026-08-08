@@ -15,5 +15,8 @@ description.workspace = true
 crate-type = ["cdylib"]
 
 [dependencies]
-ashwa = {path = "../../core"}
+ashwa = { path = "../../core" }
 wasm-bindgen = "0.2"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

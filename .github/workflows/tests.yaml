@@ -161,7 +161,7 @@ jobs:
       - name: SIMD128
         run: RUSTFLAGS="-C target-feature=+simd128" cargo test --target wasm32-wasip2 -- --nocapture
 
-  npm:
+  npm-native:
     needs: lints
     strategy:
       fail-fast: false
@@ -214,7 +214,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          target: ${{ matrix.target }} wasm32-unknown-unknown
+          target: ${{ matrix.target }}
 
       - uses: actions/setup-node@v4
         with:
@@ -225,7 +225,39 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: rust-${{ runner.os }}-${{ matrix.target }}-npm
+          key: rust-${{ runner.os }}-${{ matrix.target }}-npm-native
+
+      - name: Install dependencies & build native addon
+        run: |
+          cd npm
+          npm ci || npm install
+          npm run build:native
+
+      - name: Run NPM Native tests
+        run: |
+          cd npm
+          npm run test:native
+
+  npm-wasm:
+    needs: lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: npm/package.json
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-latest-npm-wasm-stable
 
       - name: Cache wasm-pack
         id: cache-wasm-pack
@@ -234,21 +266,35 @@ jobs:
           path: ~/.cargo/bin/wasm-pack
           key: wasm-pack-${{ runner.os }}-v0.13.1
 
-      - name: Install wasm-pack (Unix)
-        if: runner.os != 'Windows' && steps.cache-wasm-pack.outputs.cache-hit != 'true'
+      - name: Install wasm-pack
+        if: steps.cache-wasm-pack.outputs.cache-hit != 'true'
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: Install wasm-pack (Windows)
-        if: runner.os == 'Windows' && steps.cache-wasm-pack.outputs.cache-hit != 'true'
-        run: cargo install wasm-pack
+      - name: Cache Playwright Browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('npm/package.json') }}
 
-      - name: Install dependencies & build packages
+      - name: Install Playwright Browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: |
+          cd npm
+          npx playwright install chromium
+
+      - name: Install dependencies & build WASM package
         run: |
           cd npm
           npm ci || npm install
-          npm run build
+          npm run build:wasm
 
-      - name: Run NPM tests
+      - name: Run WASM Node & Headless Browser tests
         run: |
           cd npm
-          npm test
+          npm run test:wasm
+
+      - name: Run WASM Headless Browser Unit Tests (wasm-pack test)
+        run: |
+          cd npm/wasm
+          RUSTFLAGS="-C target-feature=+simd128" wasm-pack test --chrome --headless
