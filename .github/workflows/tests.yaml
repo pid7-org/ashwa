@@ -36,11 +36,11 @@ jobs:
 
       - name: check (${{ matrix.arch }})
         run: RUSTFLAGS="${{matrix.rustflags}}" cargo check --workspace --all-targets --all-features --tests --benches --examples
-        
+
   x86_64:
     needs: lints
     env:
-      RUSTFLAGS: "-D warnings"    
+      RUSTFLAGS: "-D warnings"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -58,18 +58,18 @@ jobs:
 
       - name: SSE2
         run: RUSTFLAGS="-C target-feature=+sse2" cargo test -- --nocapture
-        
+
       - name: AVX2
         run: RUSTFLAGS="-C target-feature=+avx2" cargo test -- --nocapture
-        
+
   aarch64:
     needs: lints
     env:
-      RUSTFLAGS: "-D warnings"    
+      RUSTFLAGS: "-D warnings"
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
-      
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
@@ -89,23 +89,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-i686-stable
-          
+
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cross
           git: https://github.com/cross-rs/cross
-        
+
       - name: SWAR
         run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target i686-unknown-linux-gnu -- --nocapture
-        
+
       - name: SSE2
         run: RUSTFLAGS="-C target-feature=+sse2" cross test --target i686-unknown-linux-gnu -- --nocapture
 
@@ -114,23 +114,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-armv7-stable
-          
+
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cross
           git: https://github.com/cross-rs/cross
-        
+
       - name: SWAR
         run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
-        
+
       - name: NEON
         run: RUSTFLAGS="-C target-feature=+neon" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
 
@@ -141,12 +141,12 @@ jobs:
       CARGO_TARGET_WASM32_WASIP2_RUNNER: wasmtime
     steps:
       - uses: actions/checkout@v5
-      
+
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           target: wasm32-wasip2
-          
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: rust-ubuntu-latest-wasm32-stable
@@ -154,9 +154,101 @@ jobs:
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: wasmtime-cli
- 
+
       - name: SWAR
         run: RUSTFLAGS="--cfg forced_swar_backend" cargo test --target wasm32-wasip2 -- --nocapture
 
       - name: SIMD128
         run: RUSTFLAGS="-C target-feature=+simd128" cargo test --target wasm32-wasip2 -- --nocapture
+
+  npm:
+    needs: lints
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Linux x64 (x86_64-unknown-linux-gnu)"
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+          - name: "Linux ARM64 (aarch64-unknown-linux-gnu)"
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: x64
+          - name: "macOS ARM64 (aarch64-apple-darwin)"
+            os: macos-latest
+            target: aarch64-apple-darwin
+            arch: x64
+          - name: "macOS x64 (x86_64-apple-darwin)"
+            os: macos-13
+            target: x86_64-apple-darwin
+            arch: x64
+          - name: "Windows x64 (x86_64-pc-windows-msvc)"
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x64
+          - name: "Windows ARM64 (aarch64-pc-windows-msvc)"
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+            arch: x64
+          - name: "Linux x86 32-bit (i686-unknown-linux-gnu)"
+            os: ubuntu-latest
+            target: i686-unknown-linux-gnu
+            arch: x86
+          - name: "Windows x86 32-bit (i686-pc-windows-msvc)"
+            os: windows-latest
+            target: i686-pc-windows-msvc
+            arch: x86
+          - name: "Linux ARMv7 32-bit (armv7-unknown-linux-gnueabihf)"
+            os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install 32-bit GCC dependencies (Linux i686)
+        if: matrix.target == 'i686-unknown-linux-gnu'
+        run: sudo apt-get update && sudo apt-get install -y gcc-multilib g++-multilib
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }} wasm32-unknown-unknown
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          architecture: ${{ matrix.arch }}
+          cache: "npm"
+          cache-dependency-path: npm/package.json
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-${{ runner.os }}-${{ matrix.target }}-npm
+
+      - name: Cache wasm-pack
+        id: cache-wasm-pack
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-${{ runner.os }}-v0.13.1
+
+      - name: Install wasm-pack (Unix)
+        if: runner.os != 'Windows' && steps.cache-wasm-pack.outputs.cache-hit != 'true'
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install wasm-pack (Windows)
+        if: runner.os == 'Windows' && steps.cache-wasm-pack.outputs.cache-hit != 'true'
+        run: cargo install wasm-pack
+
+      - name: Install dependencies & build packages
+        run: |
+          cd npm
+          npm ci || npm install
+          npm run build
+
+      - name: Run NPM tests
+        run: |
+          cd npm
+          npm test
