@@ -2,31 +2,50 @@
   "name": "@pid7/ashwa",
   "version": "0.1.1",
   "description": "Hardware accelerated routines for single substring search",
-  "license": "MIT",
   "main": "./index.js",
+  "module": "./browser.mjs",
   "types": "./index.d.ts",
-   "repository": {
-    "type": "git",
-    "url": "http://github.com/pid7/ashwa/"
+  "browser": {
+    "./index.js": "./browser.js",
+    "./index.mjs": "./browser.mjs"
   },
   "exports": {
     ".": {
       "types": "./index.d.ts",
+      "browser": {
+        "import": "./browser.mjs",
+        "require": "./browser.js"
+      },
+      "worker": {
+        "import": "./browser.mjs",
+        "require": "./browser.js"
+      },
+      "node": {
+        "import": "./index.mjs",
+        "require": "./index.js"
+      },
+      "import": "./browser.mjs",
       "require": "./index.js",
       "default": "./index.js"
     }
   },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pid7-org/ashwa.git"
   },
-  "license": "ISC",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "license": "MIT OR Apache-2.0",
   "type": "commonjs",
   "keywords": [
     "simd",
+    "simd128",
     "search",
     "string",
     "rust",
     "wasm",
+    "napi-rs",
     "node"
   ]
 }
