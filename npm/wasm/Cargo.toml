@@ -12,7 +12,7 @@ categories.workspace = true
 description.workspace = true
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 ashwa = { path = "../../core" }

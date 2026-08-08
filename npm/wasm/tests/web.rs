@@ -24,13 +24,13 @@ fn test_simd128_boundaries_browser() {
 
         buf[0] = 0xaa;
         buf[size - 1] = 0xbb;
-        assert_eq!(search_one(&buf, 0xbb), Some(size - 1));
+        assert_eq!(search_one(&buf, 0xbb), Some((size - 1) as i64));
 
         if size > 2 {
             let mid = size / 2;
             buf[size - 1] = 0xaa;
             buf[mid] = 0xbb;
-            assert_eq!(search_one(&buf, 0xbb), Some(mid));
+            assert_eq!(search_one(&buf, 0xbb), Some(mid as i64));
         }
     }
 }

@@ -35,10 +35,10 @@
   },
   "scripts": {
     "build:wasm": "cd wasm && RUSTFLAGS=\"-C target-feature=+simd128\" wasm-pack build --target web",
-    "build:native": "cd native && npx @napi-rs/cli build --platform --release",
+    "build:native": "cd native && npx napi build --platform --release",
     "build": "npm run build:wasm && npm run build:native",
-    "test": "npm run test:native && npm run test:wasm",
-    "test:native": "node --test tests/node.test.js tests/node.test.mjs",
+    "test": "npm run test:node && npm run test:wasm",
+    "test:node": "node --test tests/node.test.js tests/node.test.mjs",
     "test:wasm": "node --test tests/wasm.test.js tests/wasm.test.mjs tests/browser.test.js"
   },
   "devDependencies": {

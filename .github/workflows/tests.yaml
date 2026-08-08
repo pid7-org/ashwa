@@ -171,45 +171,78 @@ jobs:
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             arch: x64
+            node_version: 22
+            run_tests: true
+            
           - name: "Linux ARM64 (aarch64-unknown-linux-gnu)"
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            arch: x64
+            arch: arm64
+            node_version: 22
+            run_tests: true
+            
           - name: "macOS ARM64 (aarch64-apple-darwin)"
             os: macos-latest
             target: aarch64-apple-darwin
-            arch: x64
-          - name: "macOS x64 (x86_64-apple-darwin)"
-            os: macos-13
-            target: x86_64-apple-darwin
-            arch: x64
+            arch: arm64
+            node_version: 22
+            run_tests: true
+            
           - name: "Windows x64 (x86_64-pc-windows-msvc)"
             os: windows-latest
             target: x86_64-pc-windows-msvc
             arch: x64
+            node_version: 22
+            run_tests: true
+            
           - name: "Windows ARM64 (aarch64-pc-windows-msvc)"
-            os: windows-latest
+            os: windows-11-arm
             target: aarch64-pc-windows-msvc
-            arch: x64
+            arch: arm64
+            node_version: 22
+            run_tests: true
+            
           - name: "Linux x86 32-bit (i686-unknown-linux-gnu)"
             os: ubuntu-latest
             target: i686-unknown-linux-gnu
-            arch: x86
+            arch: x64
+            node_version: 22
+            run_tests: true
+            
           - name: "Windows x86 32-bit (i686-pc-windows-msvc)"
             os: windows-latest
             target: i686-pc-windows-msvc
             arch: x86
+            node_version: 22
+            run_tests: true
+            
           - name: "Linux ARMv7 32-bit (armv7-unknown-linux-gnueabihf)"
             os: ubuntu-latest
             target: armv7-unknown-linux-gnueabihf
-            arch: x64
+            arch: armv7l
+            node_version: 22
+            linker: arm-linux-gnueabihf-gcc
+            run_tests: true
     runs-on: ${{ matrix.os }}
+    env:
+      QEMU_LD_PREFIX: /usr/arm-linux-gnueabihf
     steps:
       - uses: actions/checkout@v5
+
+      - name: Setup QEMU for ARMv7 execution
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        uses: docker/setup-qemu-action@v3
 
       - name: Install 32-bit GCC dependencies (Linux i686)
         if: matrix.target == 'i686-unknown-linux-gnu'
         run: sudo apt-get update && sudo apt-get install -y gcc-multilib g++-multilib
+
+      - name: Install ARMv7 cross-linker & runtime dependencies (Linux ARMv7)
+        if: matrix.target == 'armv7-unknown-linux-gnueabihf'
+        run: |
+          sudo apt-get update && sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-armhf-cross
+          sudo mkdir -p /lib
+          sudo ln -sf /usr/arm-linux-gnueabihf/lib/ld-linux-armhf.so.3 /lib/ld-linux-armhf.so.3
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -218,7 +251,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node_version }}
           architecture: ${{ matrix.arch }}
           cache: "npm"
           cache-dependency-path: npm/package.json
@@ -228,15 +261,24 @@ jobs:
           key: rust-${{ runner.os }}-${{ matrix.target }}-npm-native
 
       - name: Install dependencies & build native addon
+        env:
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: ${{ matrix.linker }}
         run: |
           cd npm
           npm ci || npm install
-          npm run build:native
+          cd native
+          npx napi build --platform --release --target ${{ matrix.target }}
+
+      - name: Run NPM Native tests (Linux i686 Container)
+        if: matrix.target == 'i686-unknown-linux-gnu'
+        run: |
+          docker run --rm --platform linux/386 -v ${{ github.workspace }}:/workspace -w /workspace/npm node:18-bookworm node --test tests/node.test.js tests/node.test.mjs
 
       - name: Run NPM Native tests
+        if: matrix.target != 'i686-unknown-linux-gnu' && matrix.run_tests != false
         run: |
           cd npm
-          npm run test:native
+          npm run test:node
 
   npm-wasm:
     needs: lints
