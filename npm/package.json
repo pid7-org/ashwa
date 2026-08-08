@@ -34,7 +34,8 @@
     "url": "https://github.com/pid7-org/ashwa.git"
   },
   "scripts": {
-    "test": "node test.js"
+    "test": "node --test tests/node.test.js tests/node.test.mjs",
+    "test:node": "node --test tests/node.test.js tests/node.test.mjs"
   },
   "license": "MIT OR Apache-2.0",
   "type": "commonjs",
