@@ -14,6 +14,7 @@ mod one;
 pub use one::search_one;
 
 #[repr(u8)]
+#[cfg(target_arch = "x86_64")]
 pub(crate) enum ISA {
     NONE,
     SWAR,
@@ -24,6 +25,7 @@ pub(crate) enum ISA {
     AVX512BW,
 }
 
+#[cfg(target_arch = "x86_64")]
 impl From<u8> for ISA {
     #[inline(always)]
     fn from(value: u8) -> Self {

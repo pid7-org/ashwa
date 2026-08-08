@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "npm/native"]
+members = ["core", "npm/native", "npm/wasm"]
 default-members = ["core"]
 
 [workspace.package]

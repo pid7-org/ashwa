@@ -50,6 +50,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ashwa_wasm"
+version = "0.1.1"
+dependencies = [
+ "ashwa",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
