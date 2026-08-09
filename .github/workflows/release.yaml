@@ -38,9 +38,118 @@ jobs:
       - name: check (${{ matrix.arch }})
         run: RUSTFLAGS="${{matrix.rustflags}}" cargo check --workspace --all-targets --all-features --tests --benches --examples
 
+  build-wasm:
+    name: Build WASM Package
+    needs: lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: "npm"
+          cache-dependency-path: npm/package.json
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-ubuntu-latest-npm-wasm-release
+
+      - name: Cache wasm-pack
+        id: cache-wasm-pack
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/wasm-pack
+          key: wasm-pack-${{ runner.os }}-v0.13.1
+
+      - name: Install wasm-pack
+        if: steps.cache-wasm-pack.outputs.cache-hit != 'true'
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM package
+        run: |
+          cd npm
+          npm ci || npm install
+          npm run build:wasm
+
+      - name: Upload WASM package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-artifacts
+          path: npm/wasm/pkg/
+
+  build-native:
+    name: Build Native (${{ matrix.name }})
+    needs: lints
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "x64 (Linux)"
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            arch: x64
+
+          - name: "AArch64 (Linux)"
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch: arm64
+
+          - name: "AArch64 (Macos)"
+            os: macos-latest
+            target: aarch64-apple-darwin
+            arch: arm64
+
+          - name: "x64 (Windows 11)"
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x64
+
+          - name: "AArch64 (Windows 11)"
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.arch }}
+          cache: "npm"
+          cache-dependency-path: npm/package.json
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-${{ runner.os }}-${{ matrix.target }}-release-native
+
+      - name: Build native addon
+        run: |
+          cd npm
+          npm ci || npm install
+          cd native
+          npx napi build --platform --release --target ${{ matrix.target }}
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.target }}
+          path: npm/native/*.node
+
   publish:
     name: Publish Packages
-    needs: lints
+    needs: [lints, build-wasm, build-native]
     runs-on: ubuntu-latest
 
     steps:
@@ -52,15 +161,36 @@ jobs:
           toolchain: stable
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-          package-manager-cache: false
 
       - name: Authenticate with crates.io
         uses: rust-lang/crates-io-auth-action@v1
         id: auth
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-artifacts
+          path: npm/wasm/pkg
+
+      - name: Download Native addon artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: npm/native
+          merge-multiple: true
+
+      - name: Verify bundled npm package contents
+        run: |
+          ls -la npm/native/*.node
+          ls -la npm/wasm/pkg
+
+      # ------------------------------------------------------------
+      # Dry runs — nothing is published before both packages pass
+      # ------------------------------------------------------------
 
       - name: Dry Run — crates.io
         run: cargo publish --dry-run --locked
@@ -68,6 +198,10 @@ jobs:
       - name: Dry Run — npm
         working-directory: npm
         run: npm publish --dry-run --access public
+
+      # ------------------------------------------------------------
+      # Actual publishing — strictly sequential
+      # ------------------------------------------------------------
 
       - name: Publish — crates.io
         run: cargo publish --locked
@@ -77,10 +211,70 @@ jobs:
       - name: Publish — npm
         working-directory: npm
         run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  test-published:
+    name: Test Published Package (${{ matrix.name }})
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "x64 (Linux)"
+            os: ubuntu-latest
+            arch: x64
+
+          - name: "AArch64 (Linux)"
+            os: ubuntu-24.04-arm
+            arch: arm64
+
+          - name: "AArch64 (Macos)"
+            os: macos-latest
+            arch: arm64
+
+          - name: "x64 (Windows 11)"
+            os: windows-latest
+            arch: x64
+
+          - name: "AArch64 (Windows 11)"
+            os: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.arch }}
+
+      - name: Download & verify published @pid7/ashwa package
+        shell: bash
+        run: |
+          mkdir -p test-published-package
+          cd test-published-package
+          npm init -y
+
+          for i in {1..6}; do
+            npm install @pid7/ashwa@latest --no-cache && break || sleep 10
+          done
+
+          node -e '
+            const ashwa = require("@pid7/ashwa");
+            console.log("Successfully imported @pid7/ashwa!");
+            console.log("isNative:", ashwa.isNative);
+            const haystack = Buffer.from("hello world");
+            const res = ashwa.searchOne(haystack, "w".charCodeAt(0));
+            console.log("Search result index:", res);
+            if (res !== 6) {
+              console.error("Expected index 6, got:", res);
+              process.exit(1);
+            }
+            console.log("Verification passed successfully!");
+          '
 
   release:
     name: GitHub Release
-    needs: publish
+    needs: test-published
     runs-on: ubuntu-latest
 
     steps:

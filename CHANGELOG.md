@@ -20,3 +20,9 @@ All notable changes to this project will be documented in this file.
   - Published Rust crate [`ashwa`](https://crates.io/crates/ashwa) on [crates.io](https://crates.io/crates/ashwa)
   - Published JavaScript/TypeScript package [`@pid7/ashwa`](https://www.npmjs.com/package/@pid7/ashwa) on
     [npm](https://www.npmjs.com/package/@pid7/ashwa) with pre-built native binaries and WebAssembly fallback
+- **Public API Documentation**: Comprehensive JSDoc and TypeScript definitions (`index.d.ts`) across all NPM modules, native bindings, and WASM packages
+- **Automated CI/CD Release Workflow**: Added GitHub Actions workflow (`release.yaml`) for automated multi-platform verification and publishing to [crates.io](https://crates.io/crates/ashwa) and [npm](https://www.npmjs.com/package/@pid7/ashwa)
+
+### Fixed
+
+- **Documentation**: Fixed links and formatting in root `README.md` and `npm/README.md`
