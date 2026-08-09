@@ -8,7 +8,7 @@
 
 Hardware accelerated routines for single substring search
 
-## Directories
+## Language Support
 
 `ashwa` is available across multiple language ecosystems,
 
@@ -16,8 +16,6 @@ Hardware accelerated routines for single substring search
 - [`npm`](npm/README.md)
 
 ## Supported Platforms
-
-`ashwa` features dynamic runtime CPU detection and target-specific vector acceleration with fallback algorithms for non-vectorized environments:
 
 | Architecture        | Target Platform                              | Hardware Acceleration                | Fallback    |
 |:--------------------|:---------------------------------------------|:-------------------------------------|:------------|
