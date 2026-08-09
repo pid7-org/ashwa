@@ -1,12 +1,28 @@
 /**
- * Searches for the first occurrence of `needle` in `haystack`.
- * 
- * - **Node.js**: Runs via `napi-rs` native addon (Synchronous CPU SIMD).
- * - **Browser / WASM**: Runs via `wasm-bindgen` WebAssembly (SIMD128 accelerated).
+ * Hardware-accelerated search routines (`@pid7/ashwa`).
+ *
+ * @module @pid7/ashwa
+ */
+
+/**
+ * Searches for the first occurrence of `needle` (byte value 0-255) within `haystack` (Uint8Array / Buffer).
+ *
+ * Execution backend:
+ * - **Node.js / Bun / Deno**: Executes synchronously via N-API native bindings with SIMD vectorization (AVX-512BW, AVX2, SSE2, ARM NEON).
+ * - **Browser / WebWorker**: Executes via WebAssembly SIMD (`simd128`), automatically initializing the WASM module on first invocation if not already loaded.
  *
  * @param haystack - The byte array/buffer to search.
- * @param needle - The byte value (0-255) to locate.
- * @returns The matching index, or `null` if not found.
+ * @param needle - The target byte value (0–255) to locate.
+ * @returns The 0-based byte index of the first occurrence of `needle`, or `null` if not found.
+ *
+ * @example
+ * ```javascript
+ * import { searchOne } from '@pid7/ashwa';
+ *
+ * const haystack = new TextEncoder().encode("Hello, World!");
+ * const index = await searchOne(haystack, "W".charCodeAt(0));
+ * console.log(index); // 7
+ * ```
  */
 export function searchOne(
   haystack: Uint8Array,
@@ -14,18 +30,41 @@ export function searchOne(
 ): number | null | Promise<number | null>;
 
 /**
- * Initializes the WebAssembly backend (Browser only).
- * In Node.js native mode, this returns immediately.
+ * Asynchronously pre-initializes the WebAssembly module backend (Browser / WebWorker).
+ *
+ * In Node.js native mode (`isNative === true`), this is a no-op that resolves immediately.
+ *
+ * @param moduleOrPath - Optional WebAssembly.Module, Response, ArrayBuffer, or fetch URL path to load the WASM binary from.
+ * @returns A promise that resolves when initialization completes.
+ *
+ * @example
+ * ```javascript
+ * import { init, searchOne } from '@pid7/ashwa';
+ *
+ * // Pre-initialize WASM during application bootstrap
+ * await init();
+ * ```
  */
 export function init(moduleOrPath?: any): Promise<void>;
 
 /**
- * Synchronously initializes the WebAssembly backend with a WebAssembly.Module or buffer.
- * In Node.js native mode, this is a no-op.
+ * Synchronously initializes the WebAssembly module backend using pre-loaded byte data or a compiled `WebAssembly.Module`.
+ *
+ * In Node.js native mode (`isNative === true`), this is a no-op.
+ *
+ * @param bytesOrModule - An `ArrayBuffer`, `Uint8Array`, or compiled `WebAssembly.Module`.
+ *
+ * @example
+ * ```javascript
+ * import { initSync } from '@pid7/ashwa';
+ *
+ * initSync(wasmBuffer);
+ * ```
  */
-export function initSync(bytesOrModule: any): void;
+export function initSync(bytesOrModule?: any): void;
 
 /**
- * `true` if running on Node native backend (napi-rs), `false` if running on WebAssembly (wasm-bindgen).
+ * Boolean flag indicating whether `@pid7/ashwa` is running via native N-API bindings (`true`)
+ * or WebAssembly SIMD (`false`).
  */
 export const isNative: boolean;

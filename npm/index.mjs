@@ -1,13 +1,37 @@
+/**
+ * Main ESM entry point for `@pid7/ashwa` in Node.js environments.
+ *
+ * @module @pid7/ashwa
+ */
+
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
 const native = require("./native/index.js");
 
+/**
+ * `true` when running on native N-API bindings, `false` when running on WebAssembly.
+ */
 export const isNative = true;
 
+/**
+ * Asynchronously pre-initializes the WebAssembly module. No-op on native Node.js.
+ * @returns {Promise<void>}
+ */
 export async function init() {}
+
+/**
+ * Synchronously initializes the WebAssembly module. No-op on native Node.js.
+ */
 export function initSync() {}
 
+/**
+ * Searches for the first occurrence of `needle` in `haystack`.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {number} needle - Target byte (0-255).
+ * @returns {number|null} 0-based index or null if not found.
+ */
 export function searchOne(haystack, needle) {
   const res = native.searchOne(haystack, needle);
   return res !== undefined && res !== null ? Number(res) : null;

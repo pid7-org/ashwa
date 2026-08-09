@@ -1,3 +1,9 @@
+/**
+ * Browser ESM entry point for `@pid7/ashwa` using WebAssembly SIMD bindings.
+ *
+ * @module @pid7/ashwa/browser
+ */
+
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import initWasm, {
@@ -8,8 +14,17 @@ import initWasm, {
 let isInitialized = false;
 let initPromise = null;
 
+/**
+ * `false` indicating WebAssembly execution mode.
+ */
 export const isNative = false;
 
+/**
+ * Asynchronously initializes the WebAssembly module.
+ *
+ * @param {any} [moduleOrPath] - Optional WebAssembly.Module, ArrayBuffer, or URL to load WASM from.
+ * @returns {Promise<void>} Resolves when initialization completes.
+ */
 export async function init(moduleOrPath) {
   if (isInitialized) return;
   if (!initPromise) {
@@ -33,6 +48,11 @@ export async function init(moduleOrPath) {
   await initPromise;
 }
 
+/**
+ * Synchronously initializes the WebAssembly module with bytes or module.
+ *
+ * @param {any} [bytesOrModule] - ArrayBuffer, Uint8Array, or WebAssembly.Module.
+ */
 export function initSync(bytesOrModule) {
   let input = bytesOrModule;
   if (
@@ -50,6 +70,14 @@ export function initSync(bytesOrModule) {
   isInitialized = true;
 }
 
+/**
+ * Searches for the first occurrence of `needle` in `haystack` via WebAssembly SIMD.
+ * Automatically initializes WASM if not already loaded.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {number} needle - Target byte (0-255).
+ * @returns {Promise<number|null>} Resolves to 0-based matching index or null if not found.
+ */
 export async function searchOne(haystack, needle) {
   if (!isInitialized) {
     await init();

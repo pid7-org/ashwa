@@ -1,9 +1,21 @@
+/**
+ * Browser CommonJS entry point for `@pid7/ashwa` using WebAssembly SIMD bindings.
+ *
+ * @module @pid7/ashwa/browser
+ */
+
 const fs = require("fs");
 const path = require("path");
 
 let wasmModule = null;
 let initPromise = null;
 
+/**
+ * Asynchronously initializes the WebAssembly module.
+ *
+ * @param {any} [moduleOrPath] - Optional WebAssembly.Module, ArrayBuffer, or URL to load WASM from.
+ * @returns {Promise<any>} Resolves with the loaded WASM module instance.
+ */
 async function init(moduleOrPath) {
   if (wasmModule) return wasmModule;
   if (!initPromise) {
@@ -28,6 +40,11 @@ async function init(moduleOrPath) {
   return wasmModule;
 }
 
+/**
+ * Synchronously initializes the WebAssembly module with bytes or module.
+ *
+ * @param {any} [bytesOrModule] - ArrayBuffer, Uint8Array, or WebAssembly.Module.
+ */
 function initSync(bytesOrModule) {
   const wasm = require("./wasm/pkg/ashwa_wasm.js");
   let input = bytesOrModule;
@@ -44,6 +61,14 @@ function initSync(bytesOrModule) {
   wasmModule = wasm;
 }
 
+/**
+ * Searches for the first occurrence of `needle` in `haystack` via WebAssembly SIMD.
+ * Automatically initializes WASM if not already loaded.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {number} needle - Target byte (0-255).
+ * @returns {Promise<number|null>} Resolves to 0-based matching index or null if not found.
+ */
 async function searchOne(haystack, needle) {
   if (!wasmModule) {
     await init();
@@ -53,6 +78,9 @@ async function searchOne(haystack, needle) {
 }
 
 module.exports = {
+  /**
+   * `false` indicating WebAssembly execution mode.
+   */
   isNative: false,
   init,
   initSync,
