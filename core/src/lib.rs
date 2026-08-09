@@ -1,7 +1,26 @@
 //! Hardware accelerated routines for single substring search
+//!
+//! ## Example
+//!
+//! ```
+//! use ashwa::search_one;
+//!
+//! let haystack = b"The quick brown fox jumps over the lazy dog";
+//! assert_eq!(search_one(haystack, b'f'), Some(0x10));
+//! assert_eq!(search_one(haystack, b'z'), Some(0x25));
+//! assert_eq!(search_one(haystack, b'!'), None);
+//! ```
 
 #![cfg_attr(not(test), no_std)]
 #![allow(unsafe_op_in_unsafe_fn)]
+#![deny(
+    missing_docs,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_results
+)]
 
 #[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
 compile_error!("ashwa is only supported on 64 and 32 bit targets");
@@ -43,7 +62,6 @@ impl From<u8> for ISA {
 }
 
 /// Best available ISA on the target microarchitecture
-///
 #[cfg(target_arch = "x86_64")]
 static CPU_FEATURE: atomic::AtomicU8 = atomic::AtomicU8::new(ISA::NONE as u8);
 
@@ -55,7 +73,7 @@ pub(crate) fn get_cpu_feature() -> ISA {
     return ISA::SWAR;
 
     #[cfg(target_feature = "avx512bw")]
-    return ISA::AVX512bw;
+    return ISA::AVX512BW;
 
     #[cfg(target_feature = "avx2")]
     return ISA::AVX2;

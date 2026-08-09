@@ -29,6 +29,18 @@ const LSB32: u32 = 0x0101_0101;
 #[cfg(target_pointer_width = "32")]
 const MSB32: u32 = 0x8080_8080;
 
+/// Searches for the first occurrence of a single byte (`needle`) in a byte slice (`haystack`)
+///
+/// ## Example
+///
+/// ```
+/// use ashwa::search_one;
+///
+/// let haystack = b"hello world";
+/// assert_eq!(search_one(haystack, b'e'), Some(1));
+/// assert_eq!(search_one(haystack, b'o'), Some(4));
+/// assert_eq!(search_one(haystack, b'z'), None);
+/// ```
 #[inline(always)]
 #[cfg(target_pointer_width = "64")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
@@ -56,6 +68,18 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     }
 }
 
+/// Searches for the first occurrence of a single byte (`needle`) in a byte slice (`haystack`)
+///
+/// ## Example
+///
+/// ```
+/// use ashwa::search_one;
+///
+/// let haystack = b"hello world";
+/// assert_eq!(search_one(haystack, b'e'), Some(1));
+/// assert_eq!(search_one(haystack, b'o'), Some(4));
+/// assert_eq!(search_one(haystack, b'z'), None);
+/// ```
 #[cfg(target_pointer_width = "32")]
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     #[cfg(target_arch = "wasm32")]
