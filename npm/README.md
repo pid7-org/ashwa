@@ -7,7 +7,7 @@
 
 Hardware accelerated routines for single substring search
 
-> [!NOTE]
+> **NOTE:**
 > `@pid7/ashwa` is supported in both Node.js and browser environments. The optimal backend (native SIMD bindings for
 > Node / Bun / Deno or WebAssembly SIMD for browsers) is automatically selected at runtime.
 
@@ -43,7 +43,7 @@ console.log(`Found 'W' at byte index: ${index}`);
 
 ### WASM (Browser / WebWorker)
 
-> [!NOTE]
+> **INFO:**
 > In browser/WebWorker environments, WASM automatically initializes on the first call.
 
 ```javascript
