@@ -13,14 +13,17 @@
     ".": {
       "types": "./index.d.ts",
       "browser": {
+        "types": "./index.d.ts",
         "import": "./browser.mjs",
         "require": "./browser.js"
       },
       "worker": {
+        "types": "./index.d.ts",
         "import": "./browser.mjs",
         "require": "./browser.js"
       },
       "node": {
+        "types": "./index.d.ts",
         "import": "./index.mjs",
         "require": "./index.js"
       },
@@ -29,15 +32,35 @@
       "default": "./index.js"
     }
   },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "browser.js",
+    "browser.mjs",
+    "index.d.ts",
+    "native/index.js",
+    "native/index.d.ts",
+    "native/*.node",
+    "wasm/pkg/ashwa_wasm.js",
+    "wasm/pkg/ashwa_wasm_bg.wasm",
+    "wasm/pkg/ashwa_wasm.d.ts",
+    "wasm/pkg/ashwa_wasm_bg.wasm.d.ts",
+    "wasm/pkg/package.json"
+  ],
+  "sideEffects": false,
   "engines": {
     "node": ">=16.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/pid7-org/ashwa.git"
+    "url": "git+https://github.com/pid7-org/ashwa.git"
   },
+  "bugs": {
+    "url": "https://github.com/pid7-org/ashwa/issues"
+  },
+  "homepage": "https://github.com/pid7-org/ashwa#readme",
   "scripts": {
-    "build:wasm": "cd wasm && RUSTFLAGS=\"-C target-feature=+simd128\" wasm-pack build --target web",
+    "build:wasm": "cd wasm && RUSTFLAGS=\"-C target-feature=+simd128\" wasm-pack build --target web && rm -f pkg/.gitignore && echo '{\"type\":\"module\",\"private\":true}' > pkg/package.json",
     "build:native": "cd native && npx napi build --platform --release",
     "build": "npm run build:wasm && npm run build:native",
     "test": "npm run test:node && npm run test:wasm",

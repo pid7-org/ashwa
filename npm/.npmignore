@@ -1,0 +1,10 @@
+# Ignore source and build scratch files
+tests/
+native/src/
+native/Cargo.toml
+native/Cargo.lock
+native/build.rs
+wasm/src/
+wasm/Cargo.toml
+wasm/Cargo.lock
+wasm/tests/
