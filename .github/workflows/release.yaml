@@ -151,6 +151,9 @@ jobs:
     name: Publish Packages
     needs: [lints, build-wasm, build-native]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v5
@@ -197,7 +200,7 @@ jobs:
 
       - name: Dry Run — npm
         working-directory: npm
-        run: npm publish --dry-run --access public
+        run: npm pack --dry-run
 
       # ------------------------------------------------------------
       # Actual publishing — strictly sequential
@@ -208,11 +211,9 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
-      - name: Publish — npm
+      - name: Publish — npm (Trusted Publishing via OIDC)
         working-directory: npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
 
   test-published:
     name: Test Published Package (${{ matrix.name }})
