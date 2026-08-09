@@ -29,6 +29,9 @@
       "default": "./index.js"
     }
   },
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/pid7-org/ashwa.git"
