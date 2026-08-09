@@ -13,7 +13,7 @@ Hardware accelerated routines for single substring search
 `ashwa` is available across multiple language ecosystems,
 
 - [`rust`](#) (documented below)
-- [`npm`](npm/README.md)
+- [`npm`](https://github.com/pid7-org/ashwa/blob/master/npm/README.md)
 
 ## Supported Platforms
 
