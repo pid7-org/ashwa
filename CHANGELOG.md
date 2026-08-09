@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-08-09
+
+### Added
+
+- **Public API Documentation**: Comprehensive JSDoc doc-comments and TypeScript definitions (`index.d.ts`) across all NPM entrypoints, native bindings, and WebAssembly modules
+- **Multi-Platform CI/CD Release Workflow**: Added GitHub Actions workflow (`release.yaml`) for automated multi-platform native builds (Linux x64, Linux ARM64, macOS ARM64, Windows x64, Windows ARM64) and publishing to [crates.io](https://crates.io/crates/ashwa) and [npm](https://www.npmjs.com/package/@pid7/ashwa)
+- **Post-Publish Verification**: Added post-deployment testing in CI release workflow to download `@pid7/ashwa` directly from NPM registry and test native execution across all 5 target platform runners
+
+### Fixed
+
+- **Documentation**: Fixed links and formatting in root `README.md` and `npm/README.md`
+
 ## [0.1.1] - 2026-08-09
 
 ### Added
@@ -20,9 +32,3 @@ All notable changes to this project will be documented in this file.
   - Published Rust crate [`ashwa`](https://crates.io/crates/ashwa) on [crates.io](https://crates.io/crates/ashwa)
   - Published JavaScript/TypeScript package [`@pid7/ashwa`](https://www.npmjs.com/package/@pid7/ashwa) on
     [npm](https://www.npmjs.com/package/@pid7/ashwa) with pre-built native binaries and WebAssembly fallback
-- **Public API Documentation**: Comprehensive JSDoc and TypeScript definitions (`index.d.ts`) across all NPM modules, native bindings, and WASM packages
-- **Automated CI/CD Release Workflow**: Added GitHub Actions workflow (`release.yaml`) for automated multi-platform verification and publishing to [crates.io](https://crates.io/crates/ashwa) and [npm](https://www.npmjs.com/package/@pid7/ashwa)
-
-### Fixed
-
-- **Documentation**: Fixed links and formatting in root `README.md` and `npm/README.md`
