@@ -31,7 +31,7 @@ Add `ashwa` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ashwa = "0.1.3"
+ashwa = "0.1.4"
 ```
 
 ## Example

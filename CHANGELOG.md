@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2026-08-10
+
+### Fixed
+
+- **NPM Release Workflow**: Upgraded npm CLI to latest version in GitHub Actions release workflow to resolve OIDC provenance token exchange issues (`404 Not Found`), added `scope: '@pid7'` routing, and configured fallback auth for NPM package publishing.
+
 ## [0.1.3] - 2026-08-08
 
 ### Fixed
