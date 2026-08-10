@@ -192,20 +192,12 @@ jobs:
           ls -la npm/native/*.node
           ls -la npm/wasm/pkg
 
-      # ------------------------------------------------------------
-      # Dry runs — nothing is published before both packages pass
-      # ------------------------------------------------------------
-
       - name: Dry Run — crates.io
         run: cargo publish --dry-run --locked
 
       - name: Dry Run — npm
         working-directory: npm
         run: npm pack --dry-run
-
-      # ------------------------------------------------------------
-      # Actual publishing — strictly sequential
-      # ------------------------------------------------------------
 
       - name: Publish — crates.io
         run: cargo publish --locked
@@ -308,9 +300,10 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: true
+          generate_release_notes: true
           tag_name: ${{ github.ref_name }}
           name: Release of ${{ github.ref_name }}
           body: ${{ steps.changelog.outputs.body }}
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
