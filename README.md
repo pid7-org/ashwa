@@ -14,6 +14,7 @@ Hardware accelerated routines for single substring search
 
 - [`rust`](#) (documented below)
 - [`npm`](https://github.com/pid7-org/ashwa/blob/master/npm/README.md)
+- [`python`](https://github.com/pid7-org/ashwa/blob/master/pypi/README.md)
 
 ## Supported Platforms
 
