@@ -1,0 +1,20 @@
+[package]
+name = "ashwa_python"
+publish = false
+edition.workspace = true
+version.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description.workspace = true
+
+[lib]
+name = "ashwa"
+crate-type = ["cdylib"]
+
+[dependencies]
+ashwa = { path = "../core" }
+pyo3 = { version = "0.25", features = ["extension-module"] }
