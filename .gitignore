@@ -2,3 +2,7 @@
 **/node_modules
 **/pkg
 **.node
+
+# Python bytecode (workspace-wide)
+**/__pycache__/
+**.py[cod]
