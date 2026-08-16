@@ -288,3 +288,62 @@ jobs:
         run: |
           cd npm/wasm
           RUSTFLAGS="-C target-feature=+simd128" wasm-pack test --chrome --headless
+
+  pypi-native:
+    needs: lints
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "x64 (Linux)"
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            python_version: "3.13"
+
+          - name: "AArch64 (Linux)"
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            python_version: "3.13"
+
+          - name: "AArch64 (macOS)"
+            os: macos-latest
+            target: aarch64-apple-darwin
+            python_version: "3.13"
+
+          - name: "x64 (Windows 11)"
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            python_version: "3.13"
+
+          - name: "AArch64 (Windows 11)"
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            python_version: "3.13"
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: rust-${{ runner.os }}-${{ matrix.target }}-pypi-native
+
+      - name: Install dependencies & build native extension
+        run: |
+          cd pypi
+          pip install maturin pytest
+          maturin develop --release
+
+      - name: Run PyPI tests
+        run: |
+          cd pypi
+          pytest

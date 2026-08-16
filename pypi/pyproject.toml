@@ -41,3 +41,6 @@ manifest-path = "Cargo.toml"
 python-source = "python"
 module-name = "ashwa"
 features = ["pyo3/extension-module"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
