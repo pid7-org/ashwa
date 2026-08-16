@@ -162,36 +162,36 @@ jobs:
         run: RUSTFLAGS="-C target-feature=+simd128" cargo test --target wasm32-wasip2 -- --nocapture
 
   npm-native:
-    needs: lints
+    needs: [x86_64, aarch64, x86_32, armv7, wasm32]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: "x64 (Linux)"
+          - name: "linux-x86_64"
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             arch: x64
             node_version: 22
 
-          - name: "AArch64 (Linux)"
+          - name: "linux-aarch64"
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             arch: arm64
             node_version: 22
 
-          - name: "AArch64 (Macos)"
+          - name: "macos-aarch64"
             os: macos-latest
             target: aarch64-apple-darwin
             arch: arm64
             node_version: 22
 
-          - name: "x64 (Windows 11)"
+          - name: "windows-x86_64"
             os: windows-latest
             target: x86_64-pc-windows-msvc
             arch: x64
             node_version: 22
 
-          - name: "AArch64 (Windows 11)"
+          - name: "windows-aarch64"
             os: windows-11-arm
             target: aarch64-pc-windows-msvc
             arch: arm64
@@ -229,7 +229,7 @@ jobs:
           npm run test:node
 
   npm-wasm32:
-    needs: lints
+    needs: [x86_64, aarch64, x86_32, armv7, wasm32]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -290,32 +290,32 @@ jobs:
           RUSTFLAGS="-C target-feature=+simd128" wasm-pack test --chrome --headless
 
   pypi-native:
-    needs: lints
+    needs: [x86_64, aarch64, x86_32, armv7, wasm32]
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: "x64 (Linux)"
+          - name: "linux-x86_64"
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             python_version: "3.13"
 
-          - name: "AArch64 (Linux)"
+          - name: "linux-aarch64"
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             python_version: "3.13"
 
-          - name: "AArch64 (macOS)"
+          - name: "macos-aarch64"
             os: macos-latest
             target: aarch64-apple-darwin
             python_version: "3.13"
 
-          - name: "x64 (Windows 11)"
+          - name: "windows-x86_64"
             os: windows-latest
             target: x86_64-pc-windows-msvc
             python_version: "3.13"
 
-          - name: "AArch64 (Windows 11)"
+          - name: "windows-aarch64"
             os: windows-11-arm
             target: aarch64-pc-windows-msvc
             python_version: "3.13"
