@@ -44,7 +44,12 @@ if [ -f "README.md" ]; then
   sed -i "s/ashwa = \"$CURRENT_VERSION\"/ashwa = \"$NEW_VERSION\"/" README.md
 fi
 
-# 6. Update Cargo.lock via cargo check
+# 6. Update pypi/pyproject.toml
+if [ -f "pypi/pyproject.toml" ]; then
+  sed -i "s/^version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" pypi/pyproject.toml
+fi
+
+# 7. Update Cargo.lock via cargo check
 if command -v cargo &>/dev/null; then
   echo "Updating Cargo.lock..."
   cargo check --workspace >/dev/null 2>&1 || true
