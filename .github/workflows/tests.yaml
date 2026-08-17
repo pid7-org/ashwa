@@ -104,10 +104,10 @@ jobs:
           git: https://github.com/cross-rs/cross
 
       - name: SWAR
-        run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target i686-unknown-linux-gnu -- --nocapture
+        run: RUSTFLAGS="--cfg forced_swar_backend" cross test -p ashwa --target i686-unknown-linux-gnu -- --nocapture
 
       - name: SSE2
-        run: RUSTFLAGS="-C target-feature=+sse2" cross test --target i686-unknown-linux-gnu -- --nocapture
+        run: RUSTFLAGS="-C target-feature=+sse2" cross test -p ashwa --target i686-unknown-linux-gnu -- --nocapture
 
   armv7:
     needs: lints
@@ -129,10 +129,10 @@ jobs:
           git: https://github.com/cross-rs/cross
 
       - name: SWAR
-        run: RUSTFLAGS="--cfg forced_swar_backend" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
+        run: RUSTFLAGS="--cfg forced_swar_backend" cross test -p ashwa --target armv7-unknown-linux-gnueabihf -- --nocapture
 
       - name: NEON
-        run: RUSTFLAGS="-C target-feature=+neon" cross test --target armv7-unknown-linux-gnueabihf -- --nocapture
+        run: RUSTFLAGS="-C target-feature=+neon" cross test -p ashwa --target armv7-unknown-linux-gnueabihf -- --nocapture
 
   wasm32:
     needs: lints
@@ -156,10 +156,10 @@ jobs:
           crate: wasmtime-cli
 
       - name: SWAR
-        run: RUSTFLAGS="--cfg forced_swar_backend" cargo test --target wasm32-wasip2 -- --nocapture
+        run: RUSTFLAGS="--cfg forced_swar_backend" cargo test -p ashwa --target wasm32-wasip2 -- --nocapture
 
       - name: SIMD128
-        run: RUSTFLAGS="-C target-feature=+simd128" cargo test --target wasm32-wasip2 -- --nocapture
+        run: RUSTFLAGS="-C target-feature=+simd128" cargo test -p ashwa --target wasm32-wasip2 -- --nocapture
 
   npm-native:
     needs: [x86_64, aarch64, x86_32, armv7, wasm32]

@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["core", "npm/native", "npm/wasm", "pypi"]
+default-members = ["core"]
 
 [workspace.package]
 edition = "2024"
