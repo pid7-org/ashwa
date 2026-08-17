@@ -341,7 +341,7 @@ jobs:
         run: |
           cd pypi
           pip install maturin pytest
-          maturin develop --release
+          pip install --no-build-isolation .
 
       - name: Run PyPI tests
         run: |
