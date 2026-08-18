@@ -15,6 +15,7 @@ Hardware accelerated routines for single substring search
 | Architecture        | Target Platform                              | Hardware Acceleration                 | Fallback    |
 |:--------------------|:---------------------------------------------|:--------------------------------------|:------------|
 | **x86_64**          | Linux, macOS, Windows                        | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2  | 64-bit SWAR |
+| **i686 (x86)**      | Linux                                        | SSE2                                   | 32-bit SWAR |
 | **AArch64 (ARM64)** | Apple Silicon, Linux ARM64                   | 128-bit ARM NEON                      | 64-bit SWAR |
 | **ARMv7**           | Linux ARM                                    | 128-bit ARM NEON                      | 32-bit SWAR |
 

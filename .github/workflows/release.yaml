@@ -147,8 +147,99 @@ jobs:
           name: native-${{ matrix.target }}
           path: npm/native/*.node
 
+  build-pypi-wheels:
+    name: Build PyPI Wheel (${{ matrix.name }})
+    needs: lints
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "x86_64 (Linux)"
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+
+          - name: "AArch64 (Linux)"
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+
+          - name: "AArch64 (macOS)"
+            os: macos-latest
+            target: aarch64-apple-darwin
+
+          - name: "x86_64 (Windows)"
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+          - name: "AArch64 (Windows)"
+            os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --locked --out dist -m pypi/Cargo.toml
+          sccache: 'true'
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-wheel-${{ matrix.target }}
+          path: dist/*.whl
+
+  build-pypi-wheels-cross:
+    name: Build PyPI Wheel (${{ matrix.name }})
+    needs: lints
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "ARMv7 (Linux)"
+            target: armv7-unknown-linux-gnueabihf
+
+          - name: "i686 (Linux)"
+            target: i686-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --locked --out dist -m pypi/Cargo.toml
+          sccache: 'true'
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-wheel-${{ matrix.target }}
+          path: dist/*.whl
+
+  build-pypi-sdist:
+    name: Build PyPI sdist
+    needs: lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist -m pypi/Cargo.toml
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-sdist
+          path: dist/*.tar.gz
+
   publish:
-    name: Publish Packages
+    name: Publish crates.io & npm
     needs: [lints, build-wasm, build-native]
     runs-on: ubuntu-latest
     permissions:
@@ -213,8 +304,31 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  test-published:
-    name: Test Published Package (${{ matrix.name }})
+  publish-pypi:
+    name: Publish PyPI
+    needs: [build-pypi-wheels, build-pypi-wheels-cross, build-pypi-sdist]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download all PyPI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: pypi-*
+          path: dist
+          merge-multiple: true
+
+      - name: Verify PyPI package contents
+        run: ls -la dist/
+
+      - name: Publish — PyPI (Trusted Publishing via OIDC)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
+
+  test-published-npm:
+    name: Test npm (${{ matrix.name }})
     needs: publish
     strategy:
       fail-fast: false
@@ -271,9 +385,54 @@ jobs:
             console.log("Verification passed successfully!");
           '
 
+  test-published-pypi:
+    name: Test PyPI (${{ matrix.name }})
+    needs: publish-pypi
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "x86_64 (Linux)"
+            os: ubuntu-latest
+
+          - name: "AArch64 (Linux)"
+            os: ubuntu-24.04-arm
+
+          - name: "AArch64 (macOS)"
+            os: macos-latest
+
+          - name: "x86_64 (Windows)"
+            os: windows-latest
+
+          - name: "AArch64 (Windows)"
+            os: windows-11-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Download & verify published ashwa package
+        shell: bash
+        run: |
+          for i in {1..6}; do
+            pip install ashwa --no-cache-dir && break || sleep 10
+          done
+
+          python -c "
+          import ashwa
+          print(f'Successfully imported ashwa {ashwa.__version__}')
+          haystack = b'hello world'
+          res = ashwa.search_one(haystack, ord('w'))
+          print(f'Search result index: {res}')
+          assert res == 6, f'Expected index 6, got: {res}'
+          assert ashwa.search_one(haystack, ord('!')) is None
+          print('Verification passed successfully!')
+          "
+
   release:
     name: GitHub Release
-    needs: test-published
+    needs: [test-published-npm, test-published-pypi]
     runs-on: ubuntu-latest
 
     steps:
