@@ -1,6 +1,6 @@
 {
   "name": "@pid7/ashwa",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Hardware accelerated routines for single substring search",
   "main": "./index.js",
   "module": "./browser.mjs",

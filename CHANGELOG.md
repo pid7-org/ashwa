@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5] - 2026-08-18
+
+### Added
+
+- **PyPI Package**: Published Python package [`ashwa`](https://pypi.org/project/ashwa/) on [PyPI](https://pypi.org/project/ashwa/) with pre-built manylinux x86_64 wheel and source distribution
+
 ## [0.1.4] - 2026-08-10
 
 ### Fixed
