@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.6] - 2026-08-19
+
+- add multi-architecture PyPI wheel build and release workflow (Linux x86_64/ARM64/ARMv7/i686, macOS Apple Silicon, Windows x86_64/ARM64)
+- add Trusted Publishing (OIDC) with provenance attestations for PyPI releases
+- add post-publish verification across native platforms for PyPI package
+
 ## [0.1.5] - 2026-08-18
 
 - publish Python package to [PyPI](https://pypi.org/project/ashwa/)
