@@ -238,12 +238,11 @@ jobs:
           name: pypi-sdist
           path: dist/*.tar.gz
 
-  publish:
-    name: Publish crates.io & npm
-    needs: [lints, build-wasm, build-native]
+  publish-crates:
+    name: Publish crates.io
+    needs: [lints, build-wasm, build-native, build-pypi-wheels, build-pypi-wheels-cross, build-pypi-sdist]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       id-token: write
 
     steps:
@@ -254,16 +253,35 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Authenticate with crates.io
+        uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+
+      - name: Dry Run — crates.io
+        run: cargo publish --dry-run --locked
+
+      - name: Publish — crates.io
+        run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  publish-npm:
+    name: Publish npm
+    needs: [publish-crates, build-wasm, build-native]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           scope: '@pid7'
-
-      - name: Authenticate with crates.io
-        uses: rust-lang/crates-io-auth-action@v1
-        id: auth
 
       - name: Download WASM artifact
         uses: actions/download-artifact@v4
@@ -283,17 +301,9 @@ jobs:
           ls -la npm/native/*.node
           ls -la npm/wasm/pkg
 
-      - name: Dry Run — crates.io
-        run: cargo publish --dry-run --locked
-
       - name: Dry Run — npm
         working-directory: npm
         run: npm pack --dry-run
-
-      - name: Publish — crates.io
-        run: cargo publish --locked
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
       - name: Upgrade npm CLI
         run: npm install -g npm@latest
@@ -306,7 +316,7 @@ jobs:
 
   publish-pypi:
     name: Publish PyPI
-    needs: [build-pypi-wheels, build-pypi-wheels-cross, build-pypi-sdist]
+    needs: [publish-crates, build-pypi-wheels, build-pypi-wheels-cross, build-pypi-sdist]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -329,7 +339,7 @@ jobs:
 
   test-published-npm:
     name: Test npm (${{ matrix.name }})
-    needs: publish
+    needs: publish-npm
     strategy:
       fail-fast: false
       matrix:
@@ -408,27 +418,22 @@ jobs:
             os: windows-11-arm
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: actions/checkout@v5
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
 
-      - name: Download & verify published ashwa package
+      - name: Download & verify published ashwa package with pytest
         shell: bash
         run: |
           for i in {1..6}; do
             pip install ashwa --no-cache-dir && break || sleep 10
           done
 
-          python -c "
-          import ashwa
-          print(f'Successfully imported ashwa {ashwa.__version__}')
-          haystack = b'hello world'
-          res = ashwa.search_one(haystack, ord('w'))
-          print(f'Search result index: {res}')
-          assert res == 6, f'Expected index 6, got: {res}'
-          assert ashwa.search_one(haystack, ord('!')) is None
-          print('Verification passed successfully!')
-          "
+          pip install pytest
+          cd pypi
+          pytest
 
   release:
     name: GitHub Release
