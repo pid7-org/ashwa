@@ -84,7 +84,7 @@ jobs:
           path: npm/wasm/pkg/
 
   build-native:
-    name: Build Native (${{ matrix.name }})
+    name: Build Native & Wheel (${{ matrix.name }})
     needs: lints
     strategy:
       fail-fast: false
@@ -147,44 +147,14 @@ jobs:
           name: native-${{ matrix.target }}
           path: npm/native/*.node
 
-  build-pypi-wheels:
-    name: Build PyPI Wheel (${{ matrix.name }})
-    needs: lints
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: "x86_64 (Linux)"
-            os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-
-          - name: "AArch64 (Linux)"
-            os: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-
-          - name: "AArch64 (macOS)"
-            os: macos-latest
-            target: aarch64-apple-darwin
-
-          - name: "x86_64 (Windows)"
-            os: windows-latest
-            target: x86_64-pc-windows-msvc
-
-          - name: "AArch64 (Windows)"
-            os: windows-11-arm
-            target: aarch64-pc-windows-msvc
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Build wheel
+      - name: Build PyPI wheel
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --locked --find-interpreter --out dist -m pypi/Cargo.toml
           sccache: 'true'
 
-      - name: Upload wheel artifact
+      - name: Upload PyPI wheel artifact
         uses: actions/upload-artifact@v4
         with:
           name: pypi-wheel-${{ matrix.target }}
@@ -240,7 +210,7 @@ jobs:
 
   publish-crates:
     name: Publish crates.io
-    needs: [lints, build-wasm, build-native, build-pypi-wheels, build-pypi-wheels-cross, build-pypi-sdist]
+    needs: [lints, build-wasm, build-native, build-pypi-wheels-cross, build-pypi-sdist]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -316,7 +286,7 @@ jobs:
 
   publish-pypi:
     name: Publish PyPI
-    needs: [publish-crates, build-pypi-wheels, build-pypi-wheels-cross, build-pypi-sdist]
+    needs: [publish-crates, build-native, build-pypi-wheels-cross, build-pypi-sdist]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
