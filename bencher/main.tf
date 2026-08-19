@@ -117,12 +117,12 @@ resource "aws_instance" "bench" {
     timeout     = "6m"
   }
 
-  # Wait for instance cloud-init to finish
+  # Wait for instance boot
   provisioner "remote-exec" {
     inline = [
-      "echo '=== Waiting for cloud-init to finish... ==='",
-      "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 2; done",
-      "echo '=== Instance boot complete. ==='"
+      "echo '=== Waiting for instance boot to finish... ==='",
+      "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 1; done",
+      "echo '=== Instance ready. ==='"
     ]
   }
 
@@ -132,36 +132,26 @@ resource "aws_instance" "bench" {
     destination = "/home/ubuntu/run_benchmarks.sh"
   }
 
-  # Install toolchains, clone repo, and execute benchmarks with CPU core pinning & ISA flags
+  # Initial environment setup: only essential tools, Rust toolchains, and git clone
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "echo '=== 1. Updating APT & installing required packages ==='",
+      "echo '=== Installing essential tools (gcc, git, curl) ==='",
       "sudo apt-get update -y",
-      "sudo apt-get install -y build-essential pkg-config libssl-dev git curl util-linux",
+      "sudo apt-get install -y gcc git curl",
       
-      "echo '=== 2. Installing Rust toolchains (stable & nightly) ==='",
+      "echo '=== Installing Rust stable & nightly ==='",
       "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable",
       "source $HOME/.cargo/env",
       "rustup toolchain install nightly",
 
-      "echo '=== 3. Cloning repository from Git ==='",
+      "echo '=== Cloning repository ==='",
       "rm -rf $HOME/ashwa",
       "git clone --branch ${var.git_branch} ${var.git_repo} $HOME/ashwa",
 
-      "echo '=== 4. Starting benchmark runner on pinned CPU core (${var.cpu_core}) ==='",
       "chmod +x $HOME/run_benchmarks.sh",
-      "CPU_CORE='${var.cpu_core}' CRITERION_ARGS='${var.criterion_args}' $HOME/run_benchmarks.sh"
+      "echo '=== Server setup complete! ==='"
     ]
-  }
-
-  # Download the benchmark results log locally
-  provisioner "local-exec" {
-    command = <<-EOT
-      mkdir -p ${path.module}/results
-      scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${local_file.private_key.filename} ubuntu@${self.public_ip}:/home/ubuntu/results/benchmark_results.log ${path.module}/results/benchmark_results.log || true
-      echo "Benchmark results downloaded to ${path.module}/results/benchmark_results.log"
-    EOT
   }
 
   depends_on = [
