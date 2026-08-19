@@ -11,3 +11,8 @@
 *.tfstate.*
 *.tfvars
 *.tfvars.json
+id_ed25519*
+*.tar.gz
+results/
+
+
