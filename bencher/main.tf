@@ -20,7 +20,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 1. Fetch latest Ubuntu Noble 24.04 LTS AMI for x86_64
+# 1. Latest Ubuntu Noble 24.04 LTS AMI for x86_64
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -36,19 +36,19 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# 2. Get Default VPC & Subnet
+# 2. Default VPC
 data "aws_vpc" "default" {
   default = true
 }
 
-# 3. Security Group for SSH access & outbound internet access
+# 3. Security Group for SSH & outbound traffic
 resource "aws_security_group" "bench" {
   name_prefix = "ashwa-bench-sg-"
   description = "Security group for Ashwa benchmark EC2 instance"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description = "SSH from anywhere"
+    description = "SSH access"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -56,7 +56,7 @@ resource "aws_security_group" "bench" {
   }
 
   egress {
-    description = "Allow all outbound traffic"
+    description = "All outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -84,18 +84,7 @@ resource "local_file" "private_key" {
   file_permission = "0600"
 }
 
-# 5. Package local repository code into tarball (excluding heavy artifacts)
-resource "terraform_data" "package_ashwa" {
-  triggers_replace = [
-    timestamp()
-  ]
-
-  provisioner "local-exec" {
-    command = "tar -czf ${path.module}/ashwa.tar.gz --exclude='.git' --exclude='.terraform' --exclude='.venv' --exclude='node_modules' --exclude='target' --exclude='*.tar.gz' -C ${path.module}/.. ."
-  }
-}
-
-# 6. EC2 Instance (d3en.4xlarge: 16 vCPU, 64 GiB RAM, Cascade Lake x86_64)
+# 5. EC2 Instance (d3en.4xlarge: 16 vCPU, 64 GiB RAM, Cascade Lake x86_64)
 resource "aws_instance" "bench" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
@@ -117,10 +106,9 @@ resource "aws_instance" "bench" {
   }
 
   tags = {
-    Name = "ashwa-bench-x86_64"
+    Name = "ashwa-bench-d3en"
   }
 
-  # Connection configuration for remote-exec
   connection {
     type        = "ssh"
     user        = "ubuntu"
@@ -129,54 +117,54 @@ resource "aws_instance" "bench" {
     timeout     = "6m"
   }
 
-  # Wait for instance to become fully reachable
+  # Wait for instance cloud-init to finish
   provisioner "remote-exec" {
     inline = [
-      "echo 'Waiting for cloud-init to finish...'",
+      "echo '=== Waiting for cloud-init to finish... ==='",
       "while [ ! -f /var/lib/cloud/instance/boot-finished ]; do sleep 2; done",
-      "echo 'Instance boot complete.'"
+      "echo '=== Instance boot complete. ==='"
     ]
   }
 
-  # Upload benchmark runner script and code tarball
+  # Upload benchmark runner script
   provisioner "file" {
     source      = "${path.module}/scripts/run_benchmarks.sh"
     destination = "/home/ubuntu/run_benchmarks.sh"
   }
 
-  provisioner "file" {
-    source      = "${path.module}/ashwa.tar.gz"
-    destination = "/home/ubuntu/ashwa.tar.gz"
-  }
-
-  # Setup toolchain, extract code, and execute benchmarks with live console output
+  # Install toolchains, clone repo, and execute benchmarks with CPU core pinning & ISA flags
   provisioner "remote-exec" {
     inline = [
       "set -e",
-      "echo '=== Installing system packages ==='",
+      "echo '=== 1. Updating APT & installing required packages ==='",
       "sudo apt-get update -y",
-      "sudo apt-get install -y build-essential pkg-config libssl-dev tar curl git",
-      "echo '=== Installing Rust (${var.rust_version}) ==='",
-      "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${var.rust_version}",
-      "mkdir -p $HOME/ashwa",
-      "tar -xzf $HOME/ashwa.tar.gz -C $HOME/ashwa",
+      "sudo apt-get install -y build-essential pkg-config libssl-dev git curl util-linux",
+      
+      "echo '=== 2. Installing Rust toolchains (stable & nightly) ==='",
+      "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable",
+      "source $HOME/.cargo/env",
+      "rustup toolchain install nightly",
+
+      "echo '=== 3. Cloning repository from Git ==='",
+      "rm -rf $HOME/ashwa",
+      "git clone --branch ${var.git_branch} ${var.git_repo} $HOME/ashwa",
+
+      "echo '=== 4. Starting benchmark runner on pinned CPU core (${var.cpu_core}) ==='",
       "chmod +x $HOME/run_benchmarks.sh",
-      "echo '=== Starting Benchmark Suite ==='",
-      "$HOME/run_benchmarks.sh 2>&1 | tee $HOME/benchmark_results.log"
+      "CPU_CORE='${var.cpu_core}' CRITERION_ARGS='${var.criterion_args}' $HOME/run_benchmarks.sh"
     ]
   }
 
-  # Automatically download benchmark results log to local bencher/results directory
+  # Download the benchmark results log locally
   provisioner "local-exec" {
     command = <<-EOT
       mkdir -p ${path.module}/results
-      scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${local_file.private_key.filename} ubuntu@${self.public_ip}:/home/ubuntu/benchmark_results.log ${path.module}/results/benchmark_results.log || true
-      echo "Benchmark results saved locally to ${path.module}/results/benchmark_results.log"
+      scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${local_file.private_key.filename} ubuntu@${self.public_ip}:/home/ubuntu/results/benchmark_results.log ${path.module}/results/benchmark_results.log || true
+      echo "Benchmark results downloaded to ${path.module}/results/benchmark_results.log"
     EOT
   }
 
   depends_on = [
-    terraform_data.package_ashwa,
     local_file.private_key
   ]
 }
