@@ -351,19 +351,60 @@ jobs:
             npm install @pid7/ashwa@latest --no-cache && break || sleep 10
           done
 
-          node -e '
-            const ashwa = require("@pid7/ashwa");
-            console.log("Successfully imported @pid7/ashwa!");
-            console.log("isNative:", ashwa.isNative);
-            const haystack = Buffer.from("hello world");
-            const res = ashwa.searchOne(haystack, "w".charCodeAt(0));
-            console.log("Search result index:", res);
-            if (res !== 6) {
-              console.error("Expected index 6, got:", res);
-              process.exit(1);
-            }
-            console.log("Verification passed successfully!");
-          '
+          cat << 'EOF' > test.js
+          const { test, describe } = require("node:test");
+          const assert = require("node:assert/strict");
+          const { searchOne, isNative, init, initSync } = require("@pid7/ashwa");
+
+          describe("Node Native Published Package", () => {
+            test("Environment & exports verification", async () => {
+              assert.strictEqual(isNative, true);
+              assert.strictEqual(typeof searchOne, "function");
+              assert.strictEqual(typeof init, "function");
+              assert.strictEqual(typeof initSync, "function");
+              await init();
+              initSync();
+            });
+
+            test("Basic searchOne operations", () => {
+              const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+              assert.strictEqual(searchOne(haystack, "a".charCodeAt(0)), 0);
+              assert.strictEqual(searchOne(haystack, "m".charCodeAt(0)), 12);
+              assert.strictEqual(searchOne(haystack, "z".charCodeAt(0)), 25);
+              assert.strictEqual(searchOne(haystack, "A".charCodeAt(0)), null);
+            });
+
+            test("Empty buffer search", () => {
+              assert.strictEqual(searchOne(new Uint8Array(0), 65), null);
+              assert.strictEqual(searchOne(Buffer.alloc(0), 65), null);
+            });
+
+            test("Multiple occurrences return first match", () => {
+              const haystack = Buffer.from("banana");
+              assert.strictEqual(searchOne(haystack, "a".charCodeAt(0)), 1);
+              assert.strictEqual(searchOne(haystack, "n".charCodeAt(0)), 2);
+            });
+
+            test("Binary data & extreme byte values", () => {
+              const data = new Uint8Array([0x10, 0x20, 0x00, 0x30, 0xff, 0x40]);
+              assert.strictEqual(searchOne(data, 0x00), 2);
+              assert.strictEqual(searchOne(data, 0xff), 4);
+              assert.strictEqual(searchOne(data, 0x99), null);
+            });
+
+            test("Buffer types compatibility", () => {
+              const rawArray = [10, 20, 30, 40, 50, 60, 70, 80];
+              const uint8 = new Uint8Array(rawArray);
+              const nodeBuf = Buffer.from(rawArray);
+              const subarray = uint8.subarray(2, 6);
+              assert.strictEqual(searchOne(uint8, 50), 4);
+              assert.strictEqual(searchOne(nodeBuf, 50), 4);
+              assert.strictEqual(searchOne(subarray, 50), 2);
+            });
+          });
+          EOF
+
+          node --test test.js
 
   test-pypi:
     name: test-pypi (${{ matrix.name }})
