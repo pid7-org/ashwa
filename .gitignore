@@ -3,6 +3,11 @@
 **/pkg
 **.node
 
-# Python bytecode (workspace-wide)
 **/__pycache__/
 **.py[cod]
+
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json

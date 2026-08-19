@@ -1,22 +1,16 @@
-# Virtual environment
 .venv/
 venv/
 
-# Maturin build output
 dist/
 *.whl
 
-# Pytest
 .pytest_cache/
 
-# Python bytecode
 __pycache__/
 *.py[cod]
 
-# Egg / editable install metadata
 *.egg-info/
 *.egg
 
-# mypy / type checker caches
 .mypy_cache/
 .ruff_cache/

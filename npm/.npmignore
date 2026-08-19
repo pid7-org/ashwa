@@ -1,4 +1,3 @@
-# Ignore source and build scratch files
 tests/
 native/src/
 native/Cargo.toml
