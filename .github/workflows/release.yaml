@@ -181,7 +181,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --locked --out dist -m pypi/Cargo.toml
+          args: --release --locked --find-interpreter --out dist -m pypi/Cargo.toml
           sccache: 'true'
 
       - name: Upload wheel artifact
@@ -210,7 +210,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --locked --out dist -m pypi/Cargo.toml
+          args: --release --locked --find-interpreter --out dist -m pypi/Cargo.toml
           sccache: 'true'
 
       - name: Upload wheel artifact
