@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7] - 2026-08-19
+
+- optimize release pipeline: sequence crates.io publish before parallel npm and PyPI releases
+- unify native addon and Python wheel builds into a single matrix runner per platform
+- add `--find-interpreter` support to maturin for multi-arch wheel builds (including ARMv7 and i686 Linux)
+- run full `node:test` and `pytest` suites on live published npm and PyPI packages
+- simplify and standardize CI job naming across release workflow
+
 ## [0.1.6] - 2026-08-19
 
 - add multi-architecture PyPI wheel build and release workflow (Linux x86_64/ARM64/ARMv7/i686, macOS Apple Silicon, Windows x86_64/ARM64)
