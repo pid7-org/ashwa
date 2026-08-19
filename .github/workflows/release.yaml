@@ -180,6 +180,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
+          manylinux: 2014
           args: --release --locked --find-interpreter --out dist -m pypi/Cargo.toml
           sccache: 'true'
 
