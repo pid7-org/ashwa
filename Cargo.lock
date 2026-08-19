@@ -34,14 +34,14 @@ checksum = "940b3a0ca603d1eade50a4846a2afffd5ef57a9feac2c0e2ec2e14f9ead76000"
 
 [[package]]
 name = "ashwa"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "criterion",
 ]
 
 [[package]]
 name = "ashwa_node"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "ashwa",
  "napi",
@@ -51,7 +51,7 @@ dependencies = [
 
 [[package]]
 name = "ashwa_python"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "ashwa",
  "pyo3",
@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "ashwa_wasm"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "ashwa",
  "wasm-bindgen",
