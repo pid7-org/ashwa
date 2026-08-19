@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.1.8] - 2026-08-19
+
+- fix 32-bit i686 Linux Python wheel builds by enforcing manylinux2014 container environment
+
 ## [0.1.7] - 2026-08-19
 
 - optimize release pipeline: sequence crates.io publish before parallel npm and PyPI releases
