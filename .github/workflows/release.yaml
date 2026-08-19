@@ -38,8 +38,8 @@ jobs:
       - name: check (${{ matrix.arch }})
         run: RUSTFLAGS="${{matrix.rustflags}}" cargo check --workspace --all-targets --all-features --tests --benches --examples
 
-  build-wasm:
-    name: Build WASM Package
+  npm-wasm32:
+    name: npm-wasm32
     needs: lints
     runs-on: ubuntu-latest
     steps:
@@ -83,34 +83,34 @@ jobs:
           name: wasm-artifacts
           path: npm/wasm/pkg/
 
-  build-native:
-    name: Build Native & Wheel (${{ matrix.name }})
+  native-artifacts:
+    name: native (${{ matrix.name }})
     needs: lints
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: "x64 (Linux)"
+          - name: "linux-x86_64"
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             arch: x64
 
-          - name: "AArch64 (Linux)"
+          - name: "linux-aarch64"
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             arch: arm64
 
-          - name: "AArch64 (Macos)"
+          - name: "macos-aarch64"
             os: macos-latest
             target: aarch64-apple-darwin
             arch: arm64
 
-          - name: "x64 (Windows 11)"
+          - name: "windows-x86_64"
             os: windows-latest
             target: x86_64-pc-windows-msvc
             arch: x64
 
-          - name: "AArch64 (Windows 11)"
+          - name: "windows-aarch64"
             os: windows-11-arm
             target: aarch64-pc-windows-msvc
             arch: arm64
@@ -160,18 +160,18 @@ jobs:
           name: pypi-wheel-${{ matrix.target }}
           path: dist/*.whl
 
-  build-pypi-wheels-cross:
-    name: Build PyPI Wheel (${{ matrix.name }})
+  pypi-cross:
+    name: pypi-cross (${{ matrix.name }})
     needs: lints
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: "ARMv7 (Linux)"
+          - name: "linux-armv7"
             target: armv7-unknown-linux-gnueabihf
 
-          - name: "i686 (Linux)"
+          - name: "linux-i686"
             target: i686-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v5
@@ -189,8 +189,8 @@ jobs:
           name: pypi-wheel-${{ matrix.target }}
           path: dist/*.whl
 
-  build-pypi-sdist:
-    name: Build PyPI sdist
+  pypi-sdist:
+    name: pypi-sdist
     needs: lints
     runs-on: ubuntu-latest
     steps:
@@ -209,8 +209,8 @@ jobs:
           path: dist/*.tar.gz
 
   publish-crates:
-    name: Publish crates.io
-    needs: [lints, build-wasm, build-native, build-pypi-wheels-cross, build-pypi-sdist]
+    name: publish-crates
+    needs: [lints, npm-wasm32, native-artifacts, pypi-cross, pypi-sdist]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -236,8 +236,8 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   publish-npm:
-    name: Publish npm
-    needs: [publish-crates, build-wasm, build-native]
+    name: publish-npm
+    needs: [publish-crates, npm-wasm32, native-artifacts]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -285,8 +285,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-pypi:
-    name: Publish PyPI
-    needs: [publish-crates, build-native, build-pypi-wheels-cross, build-pypi-sdist]
+    name: publish-pypi
+    needs: [publish-crates, native-artifacts, pypi-cross, pypi-sdist]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -307,30 +307,30 @@ jobs:
         with:
           attestations: true
 
-  test-published-npm:
-    name: Test npm (${{ matrix.name }})
+  test-npm:
+    name: test-npm (${{ matrix.name }})
     needs: publish-npm
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: "x64 (Linux)"
+          - name: "linux-x86_64"
             os: ubuntu-latest
             arch: x64
 
-          - name: "AArch64 (Linux)"
+          - name: "linux-aarch64"
             os: ubuntu-24.04-arm
             arch: arm64
 
-          - name: "AArch64 (Macos)"
+          - name: "macos-aarch64"
             os: macos-latest
             arch: arm64
 
-          - name: "x64 (Windows 11)"
+          - name: "windows-x86_64"
             os: windows-latest
             arch: x64
 
-          - name: "AArch64 (Windows 11)"
+          - name: "windows-aarch64"
             os: windows-11-arm
             arch: arm64
     runs-on: ${{ matrix.os }}
@@ -365,26 +365,26 @@ jobs:
             console.log("Verification passed successfully!");
           '
 
-  test-published-pypi:
-    name: Test PyPI (${{ matrix.name }})
+  test-pypi:
+    name: test-pypi (${{ matrix.name }})
     needs: publish-pypi
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: "x86_64 (Linux)"
+          - name: "linux-x86_64"
             os: ubuntu-latest
 
-          - name: "AArch64 (Linux)"
+          - name: "linux-aarch64"
             os: ubuntu-24.04-arm
 
-          - name: "AArch64 (macOS)"
+          - name: "macos-aarch64"
             os: macos-latest
 
-          - name: "x86_64 (Windows)"
+          - name: "windows-x86_64"
             os: windows-latest
 
-          - name: "AArch64 (Windows)"
+          - name: "windows-aarch64"
             os: windows-11-arm
     runs-on: ${{ matrix.os }}
     steps:
@@ -406,8 +406,8 @@ jobs:
           pytest
 
   release:
-    name: GitHub Release
-    needs: [test-published-npm, test-published-pypi]
+    name: github-release
+    needs: [test-npm, test-pypi]
     runs-on: ubuntu-latest
 
     steps:
