@@ -3,82 +3,129 @@ set -euo pipefail
 
 CPU_CORE="${CPU_CORE:-2}"
 RESULTS_DIR="${HOME}/results"
-RESULTS_FILE="${RESULTS_DIR}/benchmark_results.log"
-CRITERION_ARGS="${CRITERION_ARGS:-}"
-
 mkdir -p "$RESULTS_DIR"
+FULL_LOG="${RESULTS_DIR}/benchmark_full.log"
+SUMMARY_FILE="${RESULTS_DIR}/summary.txt"
 
 # Ensure cargo is in PATH
 if [ -f "$HOME/.cargo/env" ]; then
+    # shellcheck source=/dev/null
     . "$HOME/.cargo/env"
 fi
 
 cd "$HOME/ashwa"
 
-run_all() {
-    echo "================================================================="
-    echo "                  SYSTEM & CPU INFORMATION                       "
-    echo "================================================================="
-    echo "Architecture: $(uname -m)"
-    echo "Kernel:       $(uname -r)"
-    echo "CPUs:         $(nproc)"
-    echo "Memory:       $(free -h | awk '/^Mem:/ {print $2}')"
-    echo "Pinned Core:  CPU $CPU_CORE (via taskset -c $CPU_CORE)"
-    echo ""
-    echo "CPU Model & Core Details:"
-    lscpu | grep -E "Model name|Flags|Architecture|CPU\(s\):|Thread|Core" || true
-    echo ""
-    echo "Checking target features:"
-    for flag in sse2 ssse3 sse4_2 avx2 avx512f avx512bw avx512vl avx512cd avx512dq avx512vbmi avx512vbmi2; do
-        if grep -q "\b$flag\b" /proc/cpuinfo; then
-            echo "  [x] $flag is SUPPORTED"
+# Ensure system is tuned for consistent benchmarking
+sudo sysctl -w kernel.randomize_va_space=0 >/dev/null 2>&1 || true
+echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1 || true
+
+echo "================================================================================"
+echo "                   ASHWA AWS EC2 BENCHMARK RUNNER                               "
+echo "================================================================================"
+echo "Date:         $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+echo "Host:         $(hostname)"
+echo "Architecture: $(uname -m)"
+echo "Kernel:       $(uname -r)"
+echo "CPUs Total:   $(nproc)"
+echo "Memory:       $(free -h | awk '/^Mem:/ {print $2}')"
+echo "Pinned Core:  CPU $CPU_CORE (via taskset -c $CPU_CORE)"
+echo ""
+echo "CPU Model & Specs:"
+lscpu | grep -E "Model name|Flags|Architecture|CPU\(s\):|Thread|Core" || true
+echo ""
+echo "x86_64 Vector Extension Capabilities:"
+for flag in sse2 ssse3 sse4_2 avx2 avx512f avx512bw avx512vl avx512cd avx512dq avx512vbmi avx512vbmi2; do
+    if grep -q "\b$flag\b" /proc/cpuinfo; then
+        echo "  [x] $flag: SUPPORTED"
+    else
+        echo "  [ ] $flag: NOT supported on this CPU"
+    fi
+done
+echo ""
+echo "Rust Toolchain Information:"
+rustc --version
+cargo --version
+echo "Git Commit / Ref: $(git rev-parse --short HEAD) ($(git branch --show-current 2>/dev/null || echo 'detached'))"
+echo "================================================================================"
+echo ""
+
+# Declare array of configurations: [Name] [RUSTFLAGS] [LOG_FILENAME]
+CONFIGS=(
+    "SWAR (Forced SWAR Backend)|--cfg forced_swar_backend|swar.log"
+    "SSE2 (128-bit SIMD)|-C target-feature=+sse2|sse2.log"
+    "SSSE3 (Supplemental SSE3)|-C target-feature=+ssse3|ssse3.log"
+    "SSE4.2 (SSE 4.2)|-C target-feature=+sse4.2|sse4_2.log"
+    "AVX2 (256-bit SIMD)|-C target-feature=+avx2|avx2.log"
+    "AVX-512BW (512-bit SIMD)|-C target-feature=+avx512bw|avx512bw.log"
+    "Native (CPUID Auto-Dispatch)|-C target-cpu=native|native.log"
+)
+
+declare -A RESULTS_MAP
+
+total_configs=${#CONFIGS[@]}
+idx=1
+
+for entry in "${CONFIGS[@]}"; do
+    IFS='|' read -r name flags log_file <<< "$entry"
+    
+    echo "================================================================================"
+    echo " [$idx/$total_configs] BENCHMARK: $name"
+    echo " RUSTFLAGS: \"$flags\""
+    echo " CPU Pinning: Core $CPU_CORE"
+    echo "================================================================================"
+    
+    # Flush disk/system caches before starting run
+    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
+    
+    # Run benchmark pinned to the selected isolated CPU core
+    set +e
+    RUSTFLAGS="$flags" taskset -c "$CPU_CORE" cargo bench -p ashwa --bench one_throughput -- --nocapture 2>&1 | tee "${RESULTS_DIR}/${log_file}"
+    status=$?
+    set -e
+    
+    if [ $status -ne 0 ]; then
+        echo "[!] Error: Benchmark failed for configuration: $name (exit code: $status)"
+        RESULTS_MAP["$name"]="FAILED"
+    else
+        # Extract throughput summary line if present
+        thrpt=$(grep -E "^Throughput" "${RESULTS_DIR}/${log_file}" | tail -n 1 || true)
+        if [ -n "$thrpt" ]; then
+            RESULTS_MAP["$name"]="$thrpt"
         else
-            echo "  [ ] $flag is NOT supported"
+            RESULTS_MAP["$name"]="COMPLETED"
         fi
+    fi
+    
+    echo ""
+    idx=$((idx + 1))
+done
+
+# Generate Summary Report
+echo "================================================================================"
+echo "                   CONSOLIDATED BENCHMARK SUMMARY                               "
+echo "================================================================================"
+printf "| %-32s | %-40s |\n" "Configuration" "Result / Throughput"
+printf "|----------------------------------|------------------------------------------|\n"
+
+for entry in "${CONFIGS[@]}"; do
+    IFS='|' read -r name flags log_file <<< "$entry"
+    res="${RESULTS_MAP[$name]:-N/A}"
+    printf "| %-32s | %-40s |\n" "$name" "$res"
+done
+echo "================================================================================"
+
+# Write summary to disk
+{
+    echo "ASHWA BENCHMARK SUMMARY ($(date -u '+%Y-%m-%d %H:%M:%S UTC'))"
+    echo "CPU: $(lscpu | grep 'Model name' | sed 's/Model name:[ \t]*//')"
+    echo "Commit: $(git rev-parse HEAD)"
+    echo "--------------------------------------------------------------------------------"
+    for entry in "${CONFIGS[@]}"; do
+        IFS='|' read -r name flags log_file <<< "$entry"
+        res="${RESULTS_MAP[$name]:-N/A}"
+        printf "%-35s : %s\n" "$name" "$res"
     done
-    echo "================================================================="
-    echo ""
-    echo "Rust Toolchains:"
-    rustc +stable --version
-    rustc +nightly --version || true
-    cargo --version
-    echo ""
-
-    # 1. SWAR Benchmark (stable)
-    echo "================================================================="
-    echo " [1/4] Running SWAR Benchmark (forced_swar_backend) on CPU $CPU_CORE"
-    echo "================================================================="
-    RUSTFLAGS="--cfg forced_swar_backend" taskset -c "$CPU_CORE" cargo bench -p ashwa --bench one_throughput -- --nocapture $CRITERION_ARGS
-    echo ""
-
-    # 2. SSE2 Benchmark (stable)
-    echo "================================================================="
-    echo " [2/4] Running SSE2 Benchmark (-C target-feature=+sse2) on CPU $CPU_CORE"
-    echo "================================================================="
-    RUSTFLAGS="-C target-feature=+sse2" taskset -c "$CPU_CORE" cargo bench -p ashwa --bench one_throughput -- --nocapture $CRITERION_ARGS
-    echo ""
-
-    # 3. AVX2 Benchmark (stable)
-    echo "================================================================="
-    echo " [3/4] Running AVX2 Benchmark (-C target-feature=+avx2) on CPU $CPU_CORE"
-    echo "================================================================="
-    RUSTFLAGS="-C target-feature=+avx2" taskset -c "$CPU_CORE" cargo bench -p ashwa --bench one_throughput -- --nocapture $CRITERION_ARGS
-    echo ""
-
-    # 4. AVX-512BW Benchmark (nightly)
-    echo "================================================================="
-    echo " [4/4] Running AVX512BW Benchmark (nightly, -C target-feature=+avx512bw) on CPU $CPU_CORE"
-    echo "================================================================="
-    RUSTFLAGS="-C target-feature=+avx512bw" taskset -c "$CPU_CORE" cargo +nightly bench -p ashwa --bench one_throughput -- --nocapture $CRITERION_ARGS
-    echo ""
-
-    echo "================================================================="
-    echo "               ALL BENCHMARKS COMPLETED SUCCESSFULLY             "
-    echo "================================================================="
-}
-
-# Run and simultaneously save to file
-run_all 2>&1 | tee "$RESULTS_FILE"
+} > "$SUMMARY_FILE"
 
 echo ""
-echo "Results successfully saved to: $RESULTS_FILE"
+echo "Complete logs saved in: $RESULTS_DIR"
