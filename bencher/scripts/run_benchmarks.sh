@@ -53,8 +53,6 @@ echo ""
 CONFIGS=(
     "SWAR (Forced SWAR Backend)|--cfg forced_swar_backend|swar.log"
     "SSE2 (128-bit SIMD)|-C target-feature=+sse2|sse2.log"
-    "SSSE3 (Supplemental SSE3)|-C target-feature=+ssse3|ssse3.log"
-    "SSE4.2 (SSE 4.2)|-C target-feature=+sse4.2|sse4_2.log"
     "AVX2 (256-bit SIMD)|-C target-feature=+avx2|avx2.log"
     "AVX-512BW (512-bit SIMD)|-C target-feature=+avx512bw|avx512bw.log"
     "Native (CPUID Auto-Dispatch)|-C target-cpu=native|native.log"

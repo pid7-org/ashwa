@@ -9,8 +9,6 @@ Automated, single-instance, multi-target AWS EC2 Spot benchmark runner for Ashwa
 - **Comprehensive x86_64 SIMD Matrix**:
   - `SWAR`: Software Architecture 64-bit word fallback (`--cfg forced_swar_backend`)
   - `SSE2`: 128-bit SIMD (`-C target-feature=+sse2`)
-  - `SSSE3`: Supplemental SSE3 (`-C target-feature=+ssse3`)
-  - `SSE4.2`: Streaming SIMD Extensions 4.2 (`-C target-feature=+sse4.2`)
   - `AVX2`: 256-bit SIMD (`-C target-feature=+avx2`)
   - `AVX-512BW`: 512-bit Byte/Word SIMD (`-C target-feature=+avx512bw`)
   - `Native`: Runtime CPUID dynamic dispatch (`-C target-cpu=native`)
