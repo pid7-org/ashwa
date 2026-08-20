@@ -30,5 +30,3 @@ inherits = "release"
 overflow-checks = false
 debug-assertions = false
 
-[workspace.dependencies]
-criterion = "0.8.2"
