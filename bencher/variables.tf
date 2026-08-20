@@ -1,24 +1,30 @@
 variable "aws_region" {
   type        = string
   default     = "us-east-1"
-  description = "AWS region (us-east-1 supports d3en.4xlarge)"
+  description = "AWS region (us-east-1 has broad availability of Ice Lake c6i instances with AVX-512BW)"
+}
+
+variable "aws_profile" {
+  type        = string
+  default     = null
+  description = "Optional AWS CLI profile name"
 }
 
 variable "instance_type" {
   type        = string
-  default     = "d3en.4xlarge"
-  description = "EC2 instance type (16 vCPU, 64 GiB RAM, Cascade Lake with AVX-512BW)"
+  default     = "c6i.2xlarge"
+  description = "EC2 instance type (Intel Xeon Ice Lake with AVX-512BW / AVX2 / SSE4.2 / SSSE3 / SSE2)"
 }
 
 variable "use_spot" {
   type        = bool
   default     = true
-  description = "Whether to use Spot instance pricing"
+  description = "Whether to use Spot instance pricing for cost efficiency"
 }
 
 variable "root_volume_size" {
   type        = number
-  default     = 50
+  default     = 30
   description = "Size of the root EBS volume in GB"
 }
 
@@ -28,20 +34,14 @@ variable "git_repo" {
   description = "Git repository URL to clone"
 }
 
-variable "git_branch" {
+variable "git_ref" {
   type        = string
   default     = "master"
-  description = "Git branch to benchmark"
+  description = "Git branch, tag, or commit hash to benchmark"
 }
 
 variable "cpu_core" {
   type        = number
   default     = 2
   description = "CPU core ID to pin benchmarks to using taskset"
-}
-
-variable "criterion_args" {
-  type        = string
-  default     = ""
-  description = "Optional additional flags for Criterion (e.g. '--warm-up-time 1 --measurement-time 2')"
 }
