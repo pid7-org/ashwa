@@ -51,3 +51,18 @@ fn main() {
     assert_eq!(search_one(text, b'!'), None);
 }
 ```
+
+## Benchmarks
+
+Benchmarked on **AWS EC2 `c6i.4xlarge`** (Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz, Ice Lake x86_64, pinned CPU core):
+
+| Buffer Size | SWAR        | SSE2        | AVX2         | AVX-512BW    | 
+|:------------|:------------|:------------|:-------------|:-------------|
+| **32 KiB**  | 20.58 GiB/s | 55.43 GiB/s | 100.05 GiB/s | 144.64 GiB/s |
+| **128 KiB** | 20.45 GiB/s | 48.29 GiB/s | 84.86 GiB/s  | 147.17 GiB/s |
+| **512 KiB** | 20.47 GiB/s | 48.32 GiB/s | 85.00 GiB/s  | 147.08 GiB/s |
+| **2 MiB**   | 19.54 GiB/s | 30.54 GiB/s | 31.43 GiB/s  | 32.45 GiB/s  |
+| **4 MiB**   | 19.62 GiB/s | 29.23 GiB/s | 29.82 GiB/s  | 31.23 GiB/s  |
+| **16 MiB**  | 19.13 GiB/s | 28.55 GiB/s | 29.58 GiB/s  | 30.59 GiB/s  |
+| **256 MiB** | 9.31 GiB/s  | 11.07 GiB/s | 12.35 GiB/s  | 12.79 GiB/s  |
+
