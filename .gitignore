@@ -6,13 +6,16 @@
 **/__pycache__/
 **.py[cod]
 
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-*.tfvars.json
-id_ed25519*
+# Terraform transient state & keys
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/*.tfvars.json
+**/id_ed25519*
 *.tar.gz
+**/results/
 results/
+
 
 
