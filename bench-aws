@@ -262,9 +262,10 @@ while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dp
     sleep 2
 done
 
-echo "  -> Installing essential build tools (gcc, git, curl, build-essential)..."
+echo "  -> Installing essential build tools (gcc, git, curl, build-essential, perf)..."
 sudo apt-get update -y -qq
-sudo apt-get install -y -qq build-essential gcc git curl pkg-config
+sudo apt-get install -y -qq build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic linux-tools-$(uname -r) || sudo apt-get install -y -qq build-essential gcc git curl pkg-config
+
 
 echo "  -> Tuning CPU governor to 'performance'..."
 sudo sysctl -w kernel.randomize_va_space=0 >/dev/null 2>&1 || true
