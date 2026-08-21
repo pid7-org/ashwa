@@ -54,15 +54,17 @@ fn main() {
 
 ## Benchmarks
 
-Benchmarked on **AWS EC2 `c6i.4xlarge`** (Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz, Ice Lake x86_64, pinned CPU core):
+Observed benchmarks for `search_one`,
 
-| Buffer Size | SWAR        | SSE2        | AVX2         | AVX-512BW    | 
-|:------------|:------------|:------------|:-------------|:-------------|
-| **32 KiB**  | 20.58 GiB/s | 55.43 GiB/s | 100.05 GiB/s | 144.64 GiB/s |
-| **128 KiB** | 20.45 GiB/s | 48.29 GiB/s | 84.86 GiB/s  | 147.17 GiB/s |
-| **512 KiB** | 20.47 GiB/s | 48.32 GiB/s | 85.00 GiB/s  | 147.08 GiB/s |
-| **2 MiB**   | 19.54 GiB/s | 30.54 GiB/s | 31.43 GiB/s  | 32.45 GiB/s  |
-| **4 MiB**   | 19.62 GiB/s | 29.23 GiB/s | 29.82 GiB/s  | 31.23 GiB/s  |
-| **16 MiB**  | 19.13 GiB/s | 28.55 GiB/s | 29.58 GiB/s  | 30.59 GiB/s  |
-| **256 MiB** | 9.31 GiB/s  | 11.07 GiB/s | 12.35 GiB/s  | 12.79 GiB/s  |
+| Tier         | Buffer Size | Latency   | Throughput   | IPC           |
+|:-------------|:------------|:----------|:-------------|:--------------|
+| L1 Cache     | 32 KiB      | 211.96 ns | 143.98 GiB/s | 1.99 insn/cyc |
+| L2 Cache     | 512 KiB     | 3.32 µs   | 146.94 GiB/s | 2.52 insn/cyc |
+| L3 Cache     | 16 MiB      | 563.34 µs | 27.74 GiB/s  | 0.48 insn/cyc |
+| Memory Bound | 256 MiB     | 21.96 ms  | 11.39 GiB/s  | 0.20 insn/cyc |
 
+> **NOTE:**
+> Benchmarked on an ephemeral **AWS EC2 `c6i.2xlarge`** instance (Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz, Ice Lake x86_64) pinned to an isolated CPU core with performance governor and ASLR disabled.
+> - **ISA**: AVX-512BW (512-bit vector SIMD via `cargo +nightly` with `-C target-cpu=native -C target-feature=+avx512bw,+avx512f`)
+> - **STREAM Triad Baseline**: 18.81 GB/s (19,264.97 MB/s, 12.46 ms)
+> - **Cache Topology**: L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB
