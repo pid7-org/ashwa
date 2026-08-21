@@ -24,7 +24,7 @@ Hardware accelerated routines for single substring search
 | **x86 (i686)**      | Windows, Linux                               | SSE2                                 | 32-bit SWAR |
 | **AArch64 (ARM64)** | Apple Silicon, Linux ARM64, Android, FreeBSD | 128-bit ARM NEON                     | 64-bit SWAR |
 | **ARMv7**           | Linux ARM, Android                           | 128-bit ARM NEON                     | 32-bit SWAR |
-| **WebAssembly**     | Browsers, Node.js (`wasm32`)                 | WASM SIMD128 (`simd128`)             | 32-bit SWAR |
+| **WebAssembly**     | Browsers, Node.js (wasm32)                   | WASM SIMD128 (simd128)               | 32-bit SWAR |
 
 ## Usage
 

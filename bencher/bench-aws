@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
+
 # ==============================================================================
 # bench-aws: Ephemeral AWS Benchmark Orchestrator for Ashwa
 # ==============================================================================
+
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TERRAFORM_DIR="${SCRIPT_DIR}"
 RESULTS_DIR="${SCRIPT_DIR}/results"
 
-# Defaults
 AWS_PROFILE_ARG=""
 REGION="us-east-1"
 INSTANCE_TYPE="c6i.2xlarge"
@@ -22,6 +23,7 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
 else
     CURRENT_REF="master"
 fi
+
 GIT_REF="$CURRENT_REF"
 
 usage() {
@@ -118,6 +120,7 @@ if [ -n "$AWS_PROFILE_ARG" ]; then
         echo "Error: AWS profile '$AWS_PROFILE_ARG' not found. Available profile(s): $AVAILABLE_PROFILES"
         exit 1
     fi
+
     EFFECTIVE_PROFILE="$AWS_PROFILE_ARG"
 elif [ -n "${AWS_PROFILE:-}" ]; then
     EFFECTIVE_PROFILE="$AWS_PROFILE"
@@ -166,8 +169,10 @@ cleanup() {
     
     cd "$TERRAFORM_DIR"
     terraform destroy -auto-approve "${TF_VAR_ARGS[@]}" || true
+    
     rm -f id_ed25519 id_ed25519.pub
     echo "  [TEARDOWN] Cleanup complete."
+    
     return $exit_code
 }
 
@@ -191,18 +196,21 @@ terraform apply -auto-approve "${TF_VAR_ARGS[@]}"
 
 PUBLIC_IP=$(terraform output -raw public_ip)
 SSH_KEY="${TERRAFORM_DIR}/id_ed25519"
+
 chmod 600 "$SSH_KEY"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $SSH_KEY"
 
 echo "Provisioned instance: $PUBLIC_IP. Polling SSH readiness..."
 max_retries=60
 retry_count=0
+
 until ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "true" >/dev/null 2>&1; do
     retry_count=$((retry_count + 1))
     if [ $retry_count -ge $max_retries ]; then
         echo "Error: Timed out waiting for SSH on $PUBLIC_IP"
         exit 1
     fi
+
     echo -n "."
     sleep 2
 done
@@ -226,7 +234,6 @@ sudo apt-get update -y -qq
 sudo apt-get install -y -qq build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic "linux-tools-$(uname -r)" || \
     sudo apt-get install -y -qq build-essential gcc git curl pkg-config
 
-# NOTE: Install Rust nightly toolchain required for AVX-512 target features and stdarch intrinsics
 if [ ! -f "$HOME/.cargo/env" ]; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly --profile minimal -q
 fi
@@ -258,4 +265,3 @@ if [ -f "${RESULTS_DIR}/summary.txt" ]; then
     cat "${RESULTS_DIR}/summary.txt"
     echo "============================================================================="
 fi
-
