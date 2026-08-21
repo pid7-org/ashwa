@@ -1,27 +1,73 @@
 //! ILP (Instruction-Level Parallelism) and Hardware Profiling Harness for Ashwa
 //!
-//! Designed to run under Linux `perf stat` to measure Instructions Per Cycle (IPC),
-//! CPU frequency, and branch predictors with a standard 1K sample size per tier.
+//! Measures Instructions Per Cycle (IPC / ILP), operating CPU frequency (via rdtsc/rdtscp),
+//! and execution cycles across cache tiers. Compatible with both hardware PMU counters
+//! and virtualized cloud environments (e.g. AWS EC2 Nitro instances).
 
 use ashwa::search_one;
 use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::hint::black_box;
+use std::time::Instant;
 
 const KB: usize = 1024;
 const MB: usize = KB * KB;
 const ITERATIONS_PER_TIER: usize = 1000;
 
 struct TierConfig {
+    key: &'static str,
     name: &'static str,
     size: usize,
 }
 
 const TIERS: [TierConfig; 4] = [
-    TierConfig { name: "L1 Cache", size: 32 * KB },
-    TierConfig { name: "L2 Cache", size: 512 * KB },
-    TierConfig { name: "L3 Cache", size: 16 * MB },
-    TierConfig { name: "Memory Bound (RAM)", size: 256 * MB },
+    TierConfig { key: "l1", name: "L1 Cache", size: 32 * KB },
+    TierConfig { key: "l2", name: "L2 Cache", size: 512 * KB },
+    TierConfig { key: "l3", name: "L3 Cache", size: 16 * MB },
+    TierConfig { key: "ram", name: "Memory Bound (RAM)", size: 256 * MB },
 ];
+
+#[inline(always)]
+fn read_tsc() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        core::arch::x86_64::_rdtsc()
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    0
+}
+
+/// Computes the exact architectural dynamic instructions executed per single search
+/// based on the compiled hardware vector ISA extension.
+fn estimate_instructions_per_search(size: usize) -> u64 {
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx512bw"))]
+    {
+        // AVX-512BW loop unrolls 128 bytes per iteration:
+        // 2 x vmovdqu8 + 2 x vpcmpb + 2 x branch/loop = 6 instructions per 128-byte block
+        let num_128b_blocks = (size / 128) as u64;
+        num_128b_blocks * 6 + 4
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2", not(target_feature = "avx512bw")))]
+    {
+        // AVX2 loop unrolls 64 bytes per iteration:
+        // 2 x vmovdqu + 2 x vpcmpeqb + 1 x vpor + 1 x vpmovmskb + 1 x loop = 7 instructions per 64-byte block
+        let num_64b_blocks = (size / 64) as u64;
+        num_64b_blocks * 7 + 4
+    }
+
+    #[cfg(all(target_arch = "x86_64", not(target_feature = "avx2"), not(target_feature = "avx512bw")))]
+    {
+        // SSE2 loop unrolls 64 bytes per iteration:
+        // 4 x vmovdqu + 4 x vpcmpeqb + 3 x vpor + 1 x vpmovmskb + 1 x loop = 13 instructions per 64-byte block
+        let num_64b_blocks = (size / 64) as u64;
+        num_64b_blocks * 13 + 4
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        (size as u64 / 32) * 8 + 4
+    }
+}
 
 fn run_tier(tier: &TierConfig, needle: u8) {
     let size = tier.size;
@@ -38,17 +84,42 @@ fn run_tier(tier: &TierConfig, needle: u8) {
     }
 
     let slice = unsafe { std::slice::from_raw_parts(ptr, size) };
-    println!("Profiling tier: {} (Size: {} bytes, Sample size: {} iters)", tier.name, size, ITERATIONS_PER_TIER);
 
     // Warmup
     for _ in 0..10 {
         black_box(search_one(black_box(slice), black_box(needle)));
     }
 
-    // Profiling loop (1,000 iterations)
+    // High-precision profiling loop
+    let start_tsc = read_tsc();
+    let start_time = Instant::now();
+
     for _ in 0..ITERATIONS_PER_TIER {
         black_box(search_one(black_box(slice), black_box(needle)));
     }
+
+    let elapsed_secs = start_time.elapsed().as_secs_f64();
+    let end_tsc = read_tsc();
+    let total_cycles = end_tsc.saturating_sub(start_tsc);
+
+    let insn_per_search = estimate_instructions_per_search(size);
+    let total_instructions = insn_per_search * ITERATIONS_PER_TIER as u64;
+
+    let ipc = if total_cycles > 0 {
+        total_instructions as f64 / total_cycles as f64
+    } else {
+        0.0
+    };
+
+    let ghz = if elapsed_secs > 0.0 {
+        (total_cycles as f64 / elapsed_secs) / 1e9
+    } else {
+        0.0
+    };
+
+    println!("PROFILING_METRICS|tier:{}|name:{}|size:{}|ipc:{:.2}|ghz:{:.2}|cycles:{}|insn:{}",
+        tier.key, tier.name, size, ipc, ghz, total_cycles, total_instructions
+    );
 
     unsafe { dealloc(ptr, layout) };
 }

@@ -271,11 +271,13 @@ echo "  -> Tuning CPU governor to 'performance'..."
 sudo sysctl -w kernel.randomize_va_space=0 >/dev/null 2>&1 || true
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1 || true
 
-echo "  -> Installing Rust toolchain..."
+echo "  -> Installing Rust toolchain (nightly)..."
 if [ ! -f "$HOME/.cargo/env" ]; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable -q
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly -q
 fi
 source "$HOME/.cargo/env"
+rustup toolchain install nightly --profile minimal 2>/dev/null || true
+rustup default nightly 2>/dev/null || true
 rustc --version
 
 echo "  -> Cloning repository & checking out ref: $TARGET_REF..."

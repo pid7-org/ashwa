@@ -119,16 +119,21 @@ printf "| %-32s | %-42s |\n" "STREAM Triad Best Time" "$STREAM_TRIAD_TIME"
 printf "+-%-32s-+-%-42s-+\n" "--------------------------------" "------------------------------------------"
 echo ""
 
-# ==============================================================================
-# CONTEXT 2: AVX-512BW THROUGHPUT & LATENCY (4 CACHE/RAM TIERS)
-# ==============================================================================
-# Configure RUSTFLAGS based on hardware support (AVX-512BW on EC2 / native fallback)
-if grep -q "\bavx512bw\b" /proc/cpuinfo 2>/dev/null; then
-    TARGET_FLAG="-C target-feature=+avx512bw"
-    TARGET_LABEL="avx512bw"
+# Detect Cargo toolchain (nightly preferred for AVX-512 features)
+CARGO_BIN="cargo"
+if command -v rustup >/dev/null 2>&1 && rustup toolchain list 2>/dev/null | grep -q nightly; then
+    CARGO_BIN="cargo +nightly"
+elif cargo +nightly --version >/dev/null 2>&1; then
+    CARGO_BIN="cargo +nightly"
+fi
+
+# Configure RUSTFLAGS: always use target-cpu=native and enable AVX-512BW when available on the CPU
+if grep -q "\bavx512bw\b" /proc/cpuinfo 2>/dev/null && grep -q "\bavx512f\b" /proc/cpuinfo 2>/dev/null; then
+    TARGET_FLAG="-C target-cpu=native -C target-feature=+avx512bw"
+    TARGET_LABEL="AVX-512BW (512-bit SIMD via target-cpu=native)"
 else
     TARGET_FLAG="-C target-cpu=native"
-    TARGET_LABEL="native ($HIGHEST_ISA)"
+    TARGET_LABEL="target-cpu=native ($HIGHEST_ISA)"
 fi
 
 RUSTFLAGS="${RUSTFLAGS:-$TARGET_FLAG}"
@@ -136,13 +141,14 @@ export RUSTFLAGS
 
 echo "================================================================================"
 echo " [2/3] RUNNING THROUGHPUT & LATENCY BENCHMARK"
+echo " Toolchain:      $CARGO_BIN"
 echo " Target Feature: $TARGET_LABEL ($RUSTFLAGS)"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "================================================================================"
 
 sync && echo 3 | sudo -n tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
-taskset -c "$CPU_CORE" cargo bench -p ashwa --bench one_throughput -- --nocapture 2>&1 | tee "${RESULTS_DIR}/throughput_latency.log"
+taskset -c "$CPU_CORE" $CARGO_BIN bench -p ashwa --bench one_throughput -- --nocapture 2>&1 | tee "${RESULTS_DIR}/throughput_latency.log"
 echo ""
 
 # ==============================================================================
@@ -151,12 +157,12 @@ echo ""
 echo "================================================================================"
 echo " [3/3] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
 echo " Harness:        core/examples/one_ilp.rs (Sample Size: 1,000 iterations per tier)"
-echo " Profiler:       Linux perf stat (hardware PMU counters)"
-echo " Target Feature: avx512bw"
+echo " Toolchain:      $CARGO_BIN"
+echo " Target Feature: $TARGET_LABEL ($RUSTFLAGS)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "================================================================================"
 
-cargo build --release -p ashwa --example one_ilp
+$CARGO_BIN build --release -p ashwa --example one_ilp
 ILP_BIN="./target/release/examples/one_ilp"
 if [ ! -f "$ILP_BIN" ]; then
     ILP_BIN="./target/release/one_ilp"
@@ -175,41 +181,50 @@ for idx in "${!TIERS[@]}"; do
     
     sync && echo 3 | sudo -n tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
     
+    # 1. Run one_ilp harness with CPU pinning to get hardware TSC cycle & IPC metrics
+    ILP_RUN=$(taskset -c "$CPU_CORE" "$ILP_BIN" "$tier" 2>&1 || true)
+    
+    tier_ipc=$(echo "$ILP_RUN" | awk -F'|' '/PROFILING_METRICS/ {for(i=1;i<=NF;i++) if($i ~ /^ipc:/) {split($i,a,":"); print a[2]}}' | tr -d ' ' || echo "")
+    tier_ghz=$(echo "$ILP_RUN" | awk -F'|' '/PROFILING_METRICS/ {for(i=1;i<=NF;i++) if($i ~ /^ghz:/) {split($i,a,":"); print a[2]}}' | tr -d ' ' || echo "")
+    
+    if [ -n "$tier_ipc" ] && [ "$tier_ipc" != "0.00" ]; then
+        ipc="${tier_ipc} insn/cyc"
+    else
+        ipc="N/A"
+    fi
+    
+    if [ -n "$tier_ghz" ] && [ "$tier_ghz" != "0.00" ]; then
+        ghz="${tier_ghz} GHz"
+    else
+        ghz="N/A"
+    fi
+    
+    # 2. Extract branch predictor metrics if perf is available
+    b_miss_pct="0.000%"
     if command -v perf >/dev/null 2>&1; then
         PERF_OUT=$(taskset -c "$CPU_CORE" perf stat -x ';' -e instructions,cycles,task-clock,branches,branch-misses "$ILP_BIN" "$tier" 2>&1 || sudo -n taskset -c "$CPU_CORE" perf stat -x ';' -e instructions,cycles,task-clock,branches,branch-misses "$ILP_BIN" "$tier" 2>&1 || true)
         
-        insn=$(echo "$PERF_OUT" | awk -F';' '/instructions/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
-        cycles=$(echo "$PERF_OUT" | awk -F';' '/\<cycles\>/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
-        task_clock=$(echo "$PERF_OUT" | awk -F';' '/task-clock/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+(\.[0-9]+)?' || echo "")
+        perf_insn=$(echo "$PERF_OUT" | awk -F';' '/instructions/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
+        perf_cycles=$(echo "$PERF_OUT" | awk -F';' '/\<cycles\>/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         b_miss=$(echo "$PERF_OUT" | awk -F';' '/branch-misses/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         b_total=$(echo "$PERF_OUT" | awk -F';' '/\<branches\>/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         
-        if [ -n "$insn" ] && [ -n "$cycles" ]; then
-            ipc=$(awk -v i="$insn" -v c="$cycles" 'BEGIN { c_num = c + 0; i_num = i + 0; if (c_num > 0) printf "%.2f insn/cyc", i_num / c_num; else print "N/A" }')
-        else
-            ipc="N/A (PMU counter not available)"
-        fi
-        
-        if [ -n "$cycles" ] && [ -n "$task_clock" ]; then
-            ghz=$(awk -v c="$cycles" -v t="$task_clock" 'BEGIN { c_num = c + 0; t_num = t + 0; if (t_num > 0) printf "%.2f GHz", (c_num / (t_num * 1000000)); else print "N/A" }')
-        else
-            ghz="N/A"
+        # If hardware PMU counters are supported, use the hardware PMU IPC
+        if [ -n "$perf_insn" ] && [ -n "$perf_cycles" ]; then
+            pmu_ipc=$(awk -v i="$perf_insn" -v c="$perf_cycles" 'BEGIN { c_num = c + 0; i_num = i + 0; if (c_num > 0) printf "%.2f insn/cyc", i_num / c_num; else print "" }')
+            if [ -n "$pmu_ipc" ]; then
+                ipc="$pmu_ipc"
+            fi
         fi
         
         if [ -n "$b_miss" ] && [ -n "$b_total" ]; then
             b_miss_pct=$(awk -v m="$b_miss" -v tot="$b_total" 'BEGIN { m_num = m + 0; tot_num = tot + 0; if (tot_num > 0) printf "%.3f%%", (m_num / tot_num) * 100; else print "0.000%" }')
-        else
-            b_miss_pct="0.000%"
         fi
-        
-        MAP_IPC["$tier"]="$ipc"
-        MAP_GHZ["$tier"]="$ghz"
-        MAP_BRANCH_MISS["$tier"]="$b_miss_pct"
-    else
-        MAP_IPC["$tier"]="N/A"
-        MAP_GHZ["$tier"]="N/A"
-        MAP_BRANCH_MISS["$tier"]="N/A"
     fi
+    
+    MAP_IPC["$tier"]="$ipc"
+    MAP_GHZ["$tier"]="$ghz"
+    MAP_BRANCH_MISS["$tier"]="$b_miss_pct"
 done
 
 echo ""
