@@ -25,6 +25,10 @@ targets = [
 name = "one_throughput"
 harness = false
 
+[[example]]
+name = "one_ilp"
+
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(forced_swar_backend)'
