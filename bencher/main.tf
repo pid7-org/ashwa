@@ -21,7 +21,6 @@ provider "aws" {
   profile = var.aws_profile
 }
 
-# 1. Latest Ubuntu 24.04 LTS AMI for x86_64
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
@@ -37,19 +36,18 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-# 2. Default VPC & Subnet
 data "aws_vpc" "default" {
   default = true
 }
 
-# 3. Ephemeral Security Group for SSH & outbound internet access
+# NOTE: Ephemeral security group allowing SSH for runner communication
 resource "aws_security_group" "bench" {
   name_prefix = "ashwa-bench-sg-"
-  description = "Security group for Ashwa benchmark EC2 instance"
+  description = "Security group for ephemeral Ashwa benchmark instance"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description = "SSH access"
+    description = "SSH runner control"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -57,7 +55,7 @@ resource "aws_security_group" "bench" {
   }
 
   egress {
-    description = "Outbound internet access"
+    description = "Outbound package repositories and toolchains"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -69,7 +67,7 @@ resource "aws_security_group" "bench" {
   }
 }
 
-# 4. Ephemeral SSH Key Pair
+# NOTE: Dynamically generated in-memory ED25519 keypair for automated session
 resource "tls_private_key" "ssh" {
   algorithm = "ED25519"
 }
@@ -85,7 +83,6 @@ resource "local_file" "private_key" {
   file_permission = "0600"
 }
 
-# 5. EC2 Benchmark Instance
 resource "aws_instance" "bench" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type

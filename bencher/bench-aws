@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# bench-aws: Automated Ephemeral AWS Benchmark Runner for Ashwa
+# bench-aws: Ephemeral AWS Benchmark Orchestrator for Ashwa
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TERRAFORM_DIR="${SCRIPT_DIR}/bencher"
-RESULTS_DIR="${SCRIPT_DIR}/bencher/results"
+TERRAFORM_DIR="${SCRIPT_DIR}"
+RESULTS_DIR="${SCRIPT_DIR}/results"
 
 # Defaults
 AWS_PROFILE_ARG=""
@@ -16,7 +16,6 @@ USE_SPOT="true"
 CPU_CORE=2
 KEEP_ALIVE="false"
 
-# Automatically detect current git branch or commit
 CURRENT_REF=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     CURRENT_REF="$(git rev-parse HEAD 2>/dev/null || echo 'master')"
@@ -29,9 +28,9 @@ usage() {
     cat <<EOF
 Usage: ./bench-aws [profile] [options]
 
-Ephemeral AWS EC2 Spot benchmark runner for Ashwa. Launches a single EC2 instance,
-runs all SIMD/SWAR benchmark configurations sequentially with CPU pinning & OS optimizations,
-collects results, and terminates the instance automatically.
+Ephemeral AWS EC2 Spot benchmark orchestrator for Ashwa. Provisions a dedicated instance,
+executes microarchitectural vector benchmarks on the highest available ISA with pinned CPU cores,
+collects artifacts, and tears down cloud resources automatically.
 
 Arguments:
   profile                   AWS CLI profile name (default: \$AWS_PROFILE or 'default')
@@ -43,18 +42,12 @@ Options:
   -b, --ref <git-ref>       Git branch, tag, or commit hash (default: current HEAD '$CURRENT_REF')
   -c, --core <id>           CPU core to pin benchmark process to (default: 2)
   --on-demand               Use On-Demand instance instead of Spot instance
-  --keep-alive              Do NOT destroy instance on exit (for debugging only)
+  --keep-alive              Do NOT destroy instance on exit (debug only)
   -h, --help                Show this help message
-
-Examples:
-  ./bench-aws
-  ./bench-aws default
-  ./bench-aws --instance c6i.4xlarge --ref master --core 2
 EOF
     exit 0
 }
 
-# Parse CLI positional and named arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
@@ -93,7 +86,6 @@ while [[ $# -gt 0 ]]; do
             usage
             ;;
         *)
-            # First positional argument is treated as profile
             if [ -z "$AWS_PROFILE_ARG" ]; then
                 AWS_PROFILE_ARG="$1"
             fi
@@ -102,7 +94,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Function to get available AWS profiles
 get_available_profiles() {
     {
         grep -E '^\s*\[profile ' ~/.aws/config 2>/dev/null | sed -E 's/^\s*\[profile\s+([^]]+)\]/\1/' || true
@@ -111,12 +102,10 @@ get_available_profiles() {
     } | sort -u
 }
 
-# Determine AWS Profile to use
 AVAILABLE_PROFILES=$(get_available_profiles | tr '\n' ' ' || true)
 EFFECTIVE_PROFILE=""
 
 if [ -n "$AWS_PROFILE_ARG" ]; then
-    # User explicitly specified a profile
     PROFILE_FOUND=false
     for p in $AVAILABLE_PROFILES; do
         if [ "$p" = "$AWS_PROFILE_ARG" ]; then
@@ -126,20 +115,15 @@ if [ -n "$AWS_PROFILE_ARG" ]; then
     done
 
     if [ "$PROFILE_FOUND" = "false" ] && [ -n "$AVAILABLE_PROFILES" ]; then
-        echo "Error: AWS profile '$AWS_PROFILE_ARG' was not found in ~/.aws/credentials or ~/.aws/config."
-        echo "Available profile(s): $AVAILABLE_PROFILES"
-        echo ""
-        echo "Please use one of the available profiles or configure it with 'aws configure --profile $AWS_PROFILE_ARG'."
+        echo "Error: AWS profile '$AWS_PROFILE_ARG' not found. Available profile(s): $AVAILABLE_PROFILES"
         exit 1
     fi
     EFFECTIVE_PROFILE="$AWS_PROFILE_ARG"
 elif [ -n "${AWS_PROFILE:-}" ]; then
     EFFECTIVE_PROFILE="$AWS_PROFILE"
 elif [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
-    # Using environment variables directly
     EFFECTIVE_PROFILE=""
 else
-    # Check if 'default' profile exists
     for p in $AVAILABLE_PROFILES; do
         if [ "$p" = "default" ]; then
             EFFECTIVE_PROFILE="default"
@@ -148,9 +132,7 @@ else
     done
 fi
 
-if [ -n "$EFFECTIVE_PROFILE" ]; then
-    export AWS_PROFILE="$EFFECTIVE_PROFILE"
-fi
+[ -n "$EFFECTIVE_PROFILE" ] && export AWS_PROFILE="$EFFECTIVE_PROFILE"
 
 TF_VAR_ARGS=(
     "-var=aws_region=$REGION"
@@ -159,84 +141,66 @@ TF_VAR_ARGS=(
     "-var=git_ref=$GIT_REF"
     "-var=cpu_core=$CPU_CORE"
 )
+[ -n "$EFFECTIVE_PROFILE" ] && TF_VAR_ARGS+=("-var=aws_profile=$EFFECTIVE_PROFILE")
 
-if [ -n "$EFFECTIVE_PROFILE" ]; then
-    TF_VAR_ARGS+=("-var=aws_profile=$EFFECTIVE_PROFILE")
-fi
-
-echo "================================================================================"
-echo "                     ASHWA AWS BENCHMARK RUNNER                                 "
-echo "================================================================================"
-echo " AWS Profile:   ${EFFECTIVE_PROFILE:-<environment credentials>}"
-echo " AWS Region:    $REGION"
-echo " Instance Type: $INSTANCE_TYPE (x86_64, AVX-512BW capable)"
-echo " Market:        $([ "$USE_SPOT" = "true" ] && echo "Spot Instance" || echo "On-Demand")"
-echo " Git Ref:       $GIT_REF"
-echo " Pinned Core:   CPU $CPU_CORE"
-echo "================================================================================"
-echo ""
-
-# Ensure required local tools are available
 for tool in terraform ssh scp git; do
     if ! command -v "$tool" >/dev/null 2>&1; then
-        echo "Error: Required tool '$tool' is not installed or not in PATH."
+        echo "Error: Required dependency '$tool' not found in PATH."
         exit 1
     fi
 done
 
-# Ephemeral teardown cleanup trap
+# NOTE: Ephemeral teardown trap guarantees cloud destruction even on SIGINT/SIGTERM
 cleanup() {
     local exit_code=$?
     if [ "$KEEP_ALIVE" = "true" ]; then
         echo ""
-        echo "[!] --keep-alive specified. Leaving EC2 instance running for debugging."
+        echo "[!] --keep-alive specified. Retaining instance for post-mortem debugging."
         return $exit_code
     fi
 
     echo ""
     echo "================================================================================"
-    echo "  [TEARDOWN] Terminating ephemeral EC2 instance and cleaning up resources...   "
+    echo "  [TEARDOWN] Destroying ephemeral cloud infrastructure...                       "
     echo "================================================================================"
     
     cd "$TERRAFORM_DIR"
     terraform destroy -auto-approve "${TF_VAR_ARGS[@]}" || true
-        
     rm -f id_ed25519 id_ed25519.pub
-    echo "================================================================================"
-    echo "  [COMPLETE] Cloud resources destroyed cleanly.                                 "
-    echo "================================================================================"
+    echo "  [TEARDOWN] Cleanup complete."
     return $exit_code
 }
 
 trap cleanup EXIT INT TERM
 
-# Step 1: Initialize Terraform
-echo "[1/5] Initializing Terraform..."
+echo "================================================================================"
+echo "                     ASHWA AWS BENCHMARK ORCHESTRATOR                           "
+echo "================================================================================"
+echo " Profile:       ${EFFECTIVE_PROFILE:-<environment credentials>}"
+echo " Region:        $REGION"
+echo " Instance Type: $INSTANCE_TYPE"
+echo " Lifecycle:     $([ "$USE_SPOT" = "true" ] && echo "Spot" || echo "On-Demand")"
+echo " Git Ref:       $GIT_REF"
+echo " Pinned Core:   CPU $CPU_CORE"
+echo "================================================================================"
+echo ""
+
 cd "$TERRAFORM_DIR"
 terraform init -input=false
-
-# Step 2: Provision Spot Instance
-echo ""
-echo "[2/5] Provisioning ephemeral benchmark instance on AWS..."
 terraform apply -auto-approve "${TF_VAR_ARGS[@]}"
 
 PUBLIC_IP=$(terraform output -raw public_ip)
 SSH_KEY="${TERRAFORM_DIR}/id_ed25519"
 chmod 600 "$SSH_KEY"
-
-echo "Instance provisioned successfully. Public IP: $PUBLIC_IP"
-
-# Step 3: Wait for SSH connectivity
-echo ""
-echo "[3/5] Waiting for instance SSH to become available..."
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $SSH_KEY"
 
+echo "Provisioned instance: $PUBLIC_IP. Polling SSH readiness..."
 max_retries=60
 retry_count=0
-until ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "echo 'SSH connected'" >/dev/null 2>&1; do
+until ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "true" >/dev/null 2>&1; do
     retry_count=$((retry_count + 1))
     if [ $retry_count -ge $max_retries ]; then
-        echo "Error: Timed out waiting for SSH connection to $PUBLIC_IP"
+        echo "Error: Timed out waiting for SSH on $PUBLIC_IP"
         exit 1
     fi
     echo -n "."
@@ -244,73 +208,54 @@ until ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "echo 'SSH connected'" >/dev/null 2>&1; 
 done
 echo " Connected!"
 
-# Step 4: Setup instance environment & dependencies (live streamed)
-echo ""
-echo "[4/5] Setting up build environment & Rust toolchain on instance..."
+# NOTE: Bootstrap provisioned host with Linux PMU tools and Rust nightly (required for AVX-512 intrinsics)
 ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" bash -s -- "$GIT_REF" << 'REMOTE_BOOTSTRAP'
 set -euo pipefail
 TARGET_REF="$1"
 export DEBIAN_FRONTEND=noninteractive
 
-echo "  -> Checking and releasing package manager locks..."
 sudo systemctl stop unattended-upgrades.service 2>/dev/null || true
 sudo systemctl disable unattended-upgrades.service 2>/dev/null || true
 sudo killall -9 apt-get apt unattended-upgrade 2>/dev/null || true
 
 while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
-    echo "     Waiting for background package lock to release..."
-    sleep 2
+    sleep 1
 done
 
-echo "  -> Installing essential build tools (gcc, git, curl, build-essential, perf)..."
 sudo apt-get update -y -qq
-sudo apt-get install -y -qq build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic linux-tools-$(uname -r) || sudo apt-get install -y -qq build-essential gcc git curl pkg-config
+sudo apt-get install -y -qq build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic "linux-tools-$(uname -r)" || \
+    sudo apt-get install -y -qq build-essential gcc git curl pkg-config
 
-
-echo "  -> Tuning CPU governor to 'performance'..."
-sudo sysctl -w kernel.randomize_va_space=0 >/dev/null 2>&1 || true
-echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor >/dev/null 2>&1 || true
-
-echo "  -> Installing Rust toolchain (nightly)..."
+# NOTE: Install Rust nightly toolchain required for AVX-512 target features and stdarch intrinsics
 if [ ! -f "$HOME/.cargo/env" ]; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly -q
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly --profile minimal -q
 fi
+# shellcheck source=/dev/null
 source "$HOME/.cargo/env"
-rustup toolchain install nightly --profile minimal 2>/dev/null || true
 rustup default nightly 2>/dev/null || true
-rustc --version
 
-echo "  -> Cloning repository & checking out ref: $TARGET_REF..."
 rm -rf "$HOME/ashwa"
 git clone -q "https://github.com/pid7-org/ashwa.git" "$HOME/ashwa"
 cd "$HOME/ashwa"
 git checkout "$TARGET_REF"
-
-echo "  -> Setup completed successfully!"
 REMOTE_BOOTSTRAP
 
-# Upload runner scripts
+# NOTE: Sync benchmark scripts to instance
 scp -r $SSH_OPTS "${TERRAFORM_DIR}/scripts" "ubuntu@$PUBLIC_IP:/home/ubuntu/"
-scp $SSH_OPTS "${TERRAFORM_DIR}/scripts/run_benchmarks.sh" "${TERRAFORM_DIR}/scripts/stream.c" "ubuntu@$PUBLIC_IP:/home/ubuntu/"
-ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "chmod +x /home/ubuntu/run_benchmarks.sh /home/ubuntu/scripts/run_benchmarks.sh 2>/dev/null || true"
+ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "chmod +x /home/ubuntu/scripts/run_benchmarks.sh"
 
-# Step 5: Execute all benchmark configurations sequentially
-echo ""
-echo "[5/5] Executing benchmark suite on remote instance..."
-echo "--------------------------------------------------------------------------------"
-ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "CPU_CORE=$CPU_CORE /home/ubuntu/run_benchmarks.sh"
-echo "--------------------------------------------------------------------------------"
+echo "================================================================================"
+echo "  [BENCHMARK] Executing suite on remote node...                                 "
+echo "================================================================================"
+ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "CPU_CORE=$CPU_CORE /home/ubuntu/scripts/run_benchmarks.sh"
 
-# Download results
 mkdir -p "$RESULTS_DIR"
 scp -r $SSH_OPTS "ubuntu@$PUBLIC_IP:/home/ubuntu/results/*" "$RESULTS_DIR/" 2>/dev/null || true
 
-echo ""
-echo "All benchmarks completed."
 if [ -f "${RESULTS_DIR}/summary.txt" ]; then
     echo ""
-    echo "--------------------------- LOCAL SUMMARY ---------------------------"
+    echo "============================= BENCHMARK SUMMARY ============================="
     cat "${RESULTS_DIR}/summary.txt"
-    echo "---------------------------------------------------------------------"
+    echo "============================================================================="
 fi
-echo "Detailed configuration logs saved in: $RESULTS_DIR"
+
