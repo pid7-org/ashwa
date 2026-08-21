@@ -69,12 +69,19 @@ L2_CACHE=$(lscpu | grep -E "L2 cache:" | sed -E 's/L2 cache:[ \t]*//' | head -n 
 L3_CACHE=$(lscpu | grep -E "L3 cache:" | sed -E 's/L3 cache:[ \t]*//' | head -n 1 || echo "N/A")
 
 # 4. STREAM Memory Benchmark (Triad Best Rate & Time)
-STREAM_SRC="${SCRIPT_DIR}/stream.c"
+STREAM_SRC=""
+for path in "${SCRIPT_DIR}/stream.c" "${HOME}/stream.c" "${HOME}/scripts/stream.c" "${HOME}/ashwa/bencher/scripts/stream.c"; do
+    if [ -f "$path" ]; then
+        STREAM_SRC="$path"
+        break
+    fi
+done
+
 STREAM_BIN="/tmp/ashwa_stream"
 STREAM_TRIAD_RATE="N/A"
 STREAM_TRIAD_TIME="N/A"
 
-if [ -f "$STREAM_SRC" ]; then
+if [ -n "$STREAM_SRC" ] && [ -f "$STREAM_SRC" ]; then
     gcc -O3 "$STREAM_SRC" -o "$STREAM_BIN" 2>/dev/null || true
     if [ -f "$STREAM_BIN" ]; then
         STREAM_OUT=$(taskset -c "$CPU_CORE" "$STREAM_BIN" 2>/dev/null || true)
@@ -82,11 +89,13 @@ if [ -f "$STREAM_SRC" ]; then
         raw_time=$(echo "$STREAM_OUT" | awk '/TRIAD_MIN_TIME_S:/ {print $2}' || true)
         
         if [ -n "$raw_rate" ]; then
-            rate_gb=$(awk -v r="$raw_rate" 'BEGIN { printf "%.2f GB/s", r/1024 }')
-            STREAM_TRIAD_RATE="$raw_rate MB/s ($rate_gb)"
+            rate_gb=$(awk -v r="$raw_rate" 'BEGIN { r_num = r + 0; if (r_num > 0) printf "%.2f GB/s", r_num/1024; else print "" }')
+            if [ -n "$rate_gb" ]; then
+                STREAM_TRIAD_RATE="$raw_rate MB/s ($rate_gb)"
+            fi
         fi
         if [ -n "$raw_time" ]; then
-            STREAM_TRIAD_TIME=$(awk -v t="$raw_time" 'BEGIN { printf "%.2f ms", t * 1000 }')
+            STREAM_TRIAD_TIME=$(awk -v t="$raw_time" 'BEGIN { t_num = t + 0; if (t_num > 0) printf "%.2f ms", t_num * 1000; else print "N/A" }')
         fi
     fi
 fi
@@ -169,26 +178,26 @@ for idx in "${!TIERS[@]}"; do
     if command -v perf >/dev/null 2>&1; then
         PERF_OUT=$(taskset -c "$CPU_CORE" perf stat -x ';' -e instructions,cycles,task-clock,branches,branch-misses "$ILP_BIN" "$tier" 2>&1 || sudo -n taskset -c "$CPU_CORE" perf stat -x ';' -e instructions,cycles,task-clock,branches,branch-misses "$ILP_BIN" "$tier" 2>&1 || true)
         
-        insn=$(echo "$PERF_OUT" | awk -F';' '/instructions/ {print $1}' | tr -d ' ' || echo "0")
-        cycles=$(echo "$PERF_OUT" | awk -F';' '/\<cycles\>/ {print $1}' | tr -d ' ' || echo "0")
-        task_clock=$(echo "$PERF_OUT" | awk -F';' '/task-clock/ {print $1}' | tr -d ' ' || echo "0")
-        b_miss=$(echo "$PERF_OUT" | awk -F';' '/branch-misses/ {print $1}' | tr -d ' ' || echo "0")
-        b_total=$(echo "$PERF_OUT" | awk -F';' '/\<branches\>/ {print $1}' | tr -d ' ' || echo "0")
+        insn=$(echo "$PERF_OUT" | awk -F';' '/instructions/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
+        cycles=$(echo "$PERF_OUT" | awk -F';' '/\<cycles\>/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
+        task_clock=$(echo "$PERF_OUT" | awk -F';' '/task-clock/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+(\.[0-9]+)?' || echo "")
+        b_miss=$(echo "$PERF_OUT" | awk -F';' '/branch-misses/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
+        b_total=$(echo "$PERF_OUT" | awk -F';' '/\<branches\>/ {print $1}' | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         
         if [ -n "$insn" ] && [ -n "$cycles" ]; then
-            ipc=$(awk -v i="$insn" -v c="$cycles" 'BEGIN { if (c > 0) printf "%.2f insn/cyc", i/c; else print "N/A" }')
+            ipc=$(awk -v i="$insn" -v c="$cycles" 'BEGIN { c_num = c + 0; i_num = i + 0; if (c_num > 0) printf "%.2f insn/cyc", i_num / c_num; else print "N/A" }')
         else
-            ipc="N/A"
+            ipc="N/A (PMU counter not available)"
         fi
         
         if [ -n "$cycles" ] && [ -n "$task_clock" ]; then
-            ghz=$(awk -v c="$cycles" -v t="$task_clock" 'BEGIN { if (t > 0) printf "%.2f GHz", (c / (t * 1000000)); else print "N/A" }')
+            ghz=$(awk -v c="$cycles" -v t="$task_clock" 'BEGIN { c_num = c + 0; t_num = t + 0; if (t_num > 0) printf "%.2f GHz", (c_num / (t_num * 1000000)); else print "N/A" }')
         else
             ghz="N/A"
         fi
         
         if [ -n "$b_miss" ] && [ -n "$b_total" ]; then
-            b_miss_pct=$(awk -v m="$b_miss" -v tot="$b_total" 'BEGIN { if (tot > 0) printf "%.3f%%", (m/tot)*100; else print "0.000%" }')
+            b_miss_pct=$(awk -v m="$b_miss" -v tot="$b_total" 'BEGIN { m_num = m + 0; tot_num = tot + 0; if (tot_num > 0) printf "%.3f%%", (m_num / tot_num) * 100; else print "0.000%" }')
         else
             b_miss_pct="0.000%"
         fi

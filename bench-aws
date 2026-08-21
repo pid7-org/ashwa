@@ -287,9 +287,10 @@ git checkout "$TARGET_REF"
 echo "  -> Setup completed successfully!"
 REMOTE_BOOTSTRAP
 
-# Upload runner script
-scp $SSH_OPTS "${TERRAFORM_DIR}/scripts/run_benchmarks.sh" "ubuntu@$PUBLIC_IP:/home/ubuntu/run_benchmarks.sh"
-ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "chmod +x /home/ubuntu/run_benchmarks.sh"
+# Upload runner scripts
+scp -r $SSH_OPTS "${TERRAFORM_DIR}/scripts" "ubuntu@$PUBLIC_IP:/home/ubuntu/"
+scp $SSH_OPTS "${TERRAFORM_DIR}/scripts/run_benchmarks.sh" "${TERRAFORM_DIR}/scripts/stream.c" "ubuntu@$PUBLIC_IP:/home/ubuntu/"
+ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "chmod +x /home/ubuntu/run_benchmarks.sh /home/ubuntu/scripts/run_benchmarks.sh 2>/dev/null || true"
 
 # Step 5: Execute all benchmark configurations sequentially
 echo ""
