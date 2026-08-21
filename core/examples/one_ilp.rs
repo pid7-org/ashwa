@@ -23,11 +23,24 @@ const TIERS: [TierConfig; 4] = [
     TierConfig { name: "Memory Bound (RAM)", size: 256 * MB },
 ];
 
-fn run_tier(tier: &TierConfig, haystack: &[u8], needle: u8) {
-    let slice = &haystack[..tier.size];
-    println!("Profiling tier: {} (Size: {} bytes, Iterations: {})", tier.name, tier.size, ITERATIONS_PER_TIER);
+fn run_tier(tier: &TierConfig, needle: u8) {
+    let size = tier.size;
+    let layout = Layout::from_size_align(size, 64).expect("valid layout");
+    let ptr = unsafe { alloc_zeroed(layout) };
 
-    // Warmup 10 iterations to ensure instructions and cachelines are active
+    if ptr.is_null() {
+        panic!("failed to allocate profiling buffer");
+    }
+
+    // Pre-fault memory
+    for page_offset in (0..size).step_by(4096) {
+        unsafe { std::ptr::write_volatile(ptr.add(page_offset), 0) };
+    }
+
+    let slice = unsafe { std::slice::from_raw_parts(ptr, size) };
+    println!("Profiling tier: {} (Size: {} bytes, Sample size: {} iters)", tier.name, size, ITERATIONS_PER_TIER);
+
+    // Warmup
     for _ in 0..10 {
         black_box(search_one(black_box(slice), black_box(needle)));
     }
@@ -36,40 +49,24 @@ fn run_tier(tier: &TierConfig, haystack: &[u8], needle: u8) {
     for _ in 0..ITERATIONS_PER_TIER {
         black_box(search_one(black_box(slice), black_box(needle)));
     }
+
+    unsafe { dealloc(ptr, layout) };
 }
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let selected_tier = args.get(1).map(|s| s.to_lowercase()).unwrap_or_else(|| "all".to_string());
-
     let needle = 0x0Au8;
-    let max_size = TIERS.iter().map(|t| t.size).max().unwrap_or(256 * MB);
-
-    let layout = Layout::from_size_align(max_size, 64).expect("valid layout");
-    let ptr = unsafe { alloc_zeroed(layout) };
-
-    if ptr.is_null() {
-        panic!("failed to allocate profiling buffer");
-    }
-
-    // Page fault in all memory
-    for page_offset in (0..max_size).step_by(4096) {
-        unsafe { std::ptr::write_volatile(ptr.add(page_offset), 0) };
-    }
-
-    let haystack = unsafe { std::slice::from_raw_parts(ptr, max_size) };
 
     match selected_tier.as_str() {
-        "l1" => run_tier(&TIERS[0], haystack, needle),
-        "l2" => run_tier(&TIERS[1], haystack, needle),
-        "l3" => run_tier(&TIERS[2], haystack, needle),
-        "ram" | "memory" => run_tier(&TIERS[3], haystack, needle),
+        "l1" => run_tier(&TIERS[0], needle),
+        "l2" => run_tier(&TIERS[1], needle),
+        "l3" => run_tier(&TIERS[2], needle),
+        "ram" | "memory" => run_tier(&TIERS[3], needle),
         _ => {
             for tier in &TIERS {
-                run_tier(tier, haystack, needle);
+                run_tier(tier, needle);
             }
         }
     }
-
-    unsafe { dealloc(ptr, layout) };
 }
