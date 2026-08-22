@@ -219,9 +219,9 @@ cleanup() {
     fi
 
     echo ""
-    echo "================================================================================"
+    echo "--------------------------------------------------------------------------------"
     echo "  [TEARDOWN] Destroying ephemeral cloud infrastructure...                       "
-    echo "================================================================================"
+    echo "--------------------------------------------------------------------------------"
 
     cd "$TERRAFORM_DIR"
     for arch in "${EXEC_ARCHES[@]}"; do
@@ -267,12 +267,16 @@ run_single_benchmark() {
     local ssh_key="${TERRAFORM_DIR}/id_ed25519_${arch}"
     local arch_results_dir="${RESULTS_DIR}/${arch}"
     local log_prefix="[$arch]"
+    local toolchain_type="stable"
+    if [ "$arch" = "x86_64" ] || [ "$arch" = "amd64" ] || [ "$arch" = "x64" ]; then
+        toolchain_type="nightly"
+    fi
 
     log() {
         echo "$log_prefix $*"
     }
 
-    log "Starting provisioning on $arch ($inst_type, Region: $REGION, Spot: $USE_SPOT)..."
+    log "[1/5] Provisioning cloud runner ($arch on $inst_type, Region: $REGION, Spot: $USE_SPOT)..."
 
     local tf_args=(
         "-state=$state_file"
@@ -293,9 +297,9 @@ run_single_benchmark() {
     public_ip=$(terraform output -state="$state_file" -raw public_ip)
 
     chmod 600 "$ssh_key"
-    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $ssh_key"
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $ssh_key"
 
-    log "Provisioned instance: $public_ip. Polling SSH readiness..."
+    log "[2/5] Polling SSH connectivity on $public_ip..."
     local max_retries=60
     local retry_count=0
 
@@ -309,12 +313,16 @@ run_single_benchmark() {
     done
     log "Connected via SSH!"
 
-    log "Bootstrapping remote node (toolchain, PMU tools, and repository checkout)..."
-    ssh $ssh_opts "ubuntu@$public_ip" bash -s -- "$GIT_REF" << 'REMOTE_BOOTSTRAP'
+    log "[3/5] Bootstrapping host environment ($toolchain_type toolchain)..."
+    ssh $ssh_opts "ubuntu@$public_ip" bash -s -- "$GIT_REF" "$toolchain_type" << 'REMOTE_BOOTSTRAP'
 set -euo pipefail
 TARGET_REF="$1"
+TOOLCHAIN_TYPE="${2:-stable}"
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
 
+sudo sed -i 's/#\$nrconf{restart} = .*/\$nrconf{restart} = "a";/' /etc/needrestart/needrestart.conf 2>/dev/null || true
 sudo systemctl stop unattended-upgrades.service 2>/dev/null || true
 sudo systemctl disable unattended-upgrades.service 2>/dev/null || true
 sudo killall -9 apt-get apt unattended-upgrade 2>/dev/null || true
@@ -323,30 +331,32 @@ while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dp
     sleep 1
 done
 
-sudo apt-get update -y -qq
-sudo apt-get install -y -qq build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic "linux-tools-$(uname -r)" || \
-    sudo apt-get install -y -qq build-essential gcc git curl pkg-config
+sudo apt-get update -y -qq >/dev/null 2>&1
+sudo apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic "linux-tools-$(uname -r)" >/dev/null 2>&1 || \
+    sudo apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" build-essential gcc git curl pkg-config >/dev/null 2>&1
 
 if [ ! -f "$HOME/.cargo/env" ]; then
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly --profile minimal -q
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "$TOOLCHAIN_TYPE" --profile minimal -q >/dev/null 2>&1
 fi
 # shellcheck source=/dev/null
 source "$HOME/.cargo/env"
-rustup default nightly 2>/dev/null || true
+rustup default "$TOOLCHAIN_TYPE" >/dev/null 2>&1 || true
 
+git config --global advice.detachedHead false
 rm -rf "$HOME/ashwa"
 git clone -q "https://github.com/pid7-org/ashwa.git" "$HOME/ashwa"
 cd "$HOME/ashwa"
-git checkout "$TARGET_REF"
+git checkout --quiet "$TARGET_REF"
 REMOTE_BOOTSTRAP
 
     log "Uploading benchmark scripts to remote node..."
     scp -r $ssh_opts "${TERRAFORM_DIR}/scripts" "ubuntu@$public_ip:/home/ubuntu/" >/dev/null
     ssh $ssh_opts "ubuntu@$public_ip" "chmod +x /home/ubuntu/scripts/run_benchmarks.sh"
 
-    log "Executing benchmark suite (Core $CPU_CORE)..."
+    log "[4/5] Executing benchmark suite on remote runner (Core $CPU_CORE)..."
     ssh $ssh_opts "ubuntu@$public_ip" "CPU_CORE=$CPU_CORE /home/ubuntu/scripts/run_benchmarks.sh"
 
+    log "[5/5] Fetching results and teardown..."
     mkdir -p "$arch_results_dir"
     scp -r $ssh_opts "ubuntu@$public_ip:/home/ubuntu/results/*" "$arch_results_dir/" >/dev/null 2>&1 || true
 
@@ -364,9 +374,9 @@ REMOTE_BOOTSTRAP
     fi
 }
 
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo "                     ASHWA AWS BENCHMARK ORCHESTRATOR                           "
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo " Profile:       ${EFFECTIVE_PROFILE:-<environment credentials>}"
 echo " Region:        $REGION"
 echo " Target Arch:   ${EXEC_ARCHES[*]}"
@@ -379,7 +389,7 @@ fi
 echo " Lifecycle:     $([ "$USE_SPOT" = "true" ] && echo "Spot" || echo "On-Demand")"
 echo " Git Ref:       $GIT_REF"
 echo " Pinned Core:   CPU $CPU_CORE"
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo ""
 
 mkdir -p "$RESULTS_DIR"
@@ -389,9 +399,9 @@ terraform init -input=false >/dev/null
 if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
     run_single_benchmark "${EXEC_ARCHES[0]}"
 else
-    echo "================================================================================"
+    echo "--------------------------------------------------------------------------------"
     echo "  [PARALLEL] Launching concurrent benchmarks on x86_64 and aarch64...           "
-    echo "================================================================================"
+    echo "--------------------------------------------------------------------------------"
     
     PIDS=()
     for arch in "${EXEC_ARCHES[@]}"; do
@@ -414,9 +424,9 @@ else
 fi
 
 echo ""
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo "                             BENCHMARK SUMMARY REPORTS                          "
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 
 for arch in "${EXEC_ARCHES[@]}"; do
     arch_summary="${RESULTS_DIR}/${arch}/summary.txt"

@@ -41,11 +41,11 @@ L1I_CACHE=$(lscpu | awk -F': +' '/L1i cache/ {print $2; exit}' || echo "N/A")
 L2_CACHE=$(lscpu  | awk -F': +' '/L2 cache/ {print $2; exit}' || echo "N/A")
 L3_CACHE=$(lscpu  | awk -F': +' '/L3 cache/ {print $2; exit}' || echo "N/A")
 
-# NOTE: AVX-512BW vectorized SIMD and target-feature codegen requires rustc nightly toolchain.
+ARCH_UNAME=$(uname -m 2>/dev/null || echo "unknown")
 CARGO_CMD="cargo"
 HAS_AVX512BW=false
 
-if grep -q "\bavx512bw\b" /proc/cpuinfo 2>/dev/null && grep -q "\bavx512f\b" /proc/cpuinfo 2>/dev/null; then
+if [ "$ARCH_UNAME" = "x86_64" ] && grep -q "\bavx512bw\b" /proc/cpuinfo 2>/dev/null && grep -q "\bavx512f\b" /proc/cpuinfo 2>/dev/null; then
     HAS_AVX512BW=true
     HIGHEST_ISA="AVX-512BW (512-bit SIMD)"
     TARGET_FLAG="-C target-cpu=native -C target-feature=+avx512bw,+avx512f"
@@ -54,9 +54,6 @@ if grep -q "\bavx512bw\b" /proc/cpuinfo 2>/dev/null && grep -q "\bavx512f\b" /pr
         CARGO_CMD="cargo +nightly"
     elif cargo +nightly --version >/dev/null 2>&1; then
         CARGO_CMD="cargo +nightly"
-    else
-        # WARN: Hardware supports AVX-512BW but nightly toolchain is missing; attempting rustup installation
-        rustup toolchain install nightly --profile minimal >/dev/null 2>&1 && CARGO_CMD="cargo +nightly" || true
     fi
 elif grep -q "\bavx2\b" /proc/cpuinfo 2>/dev/null; then
     HIGHEST_ISA="AVX2 (256-bit SIMD)"
@@ -70,17 +67,14 @@ elif grep -q "\bssse3\b" /proc/cpuinfo 2>/dev/null; then
 elif grep -q "\bsse2\b" /proc/cpuinfo 2>/dev/null; then
     HIGHEST_ISA="SSE2 (128-bit SIMD)"
     TARGET_FLAG="-C target-cpu=native"
-elif [ "$(uname -m 2>/dev/null)" = "aarch64" ] || [ "$(uname -m 2>/dev/null)" = "arm64" ] || grep -q -E "\b(asimd|neon)\b" /proc/cpuinfo 2>/dev/null; then
+elif [ "$ARCH_UNAME" = "aarch64" ] || [ "$ARCH_UNAME" = "arm64" ] || grep -q -E "\b(asimd|neon)\b" /proc/cpuinfo 2>/dev/null; then
     HIGHEST_ISA="ARM NEON (128-bit SIMD)"
-    TARGET_FLAG="-C target-cpu=native -C target-feature=+neon"
-    if command -v rustup >/dev/null 2>&1 && rustup toolchain list 2>/dev/null | grep -q nightly; then
-        CARGO_CMD="cargo +nightly"
-    elif cargo +nightly --version >/dev/null 2>&1; then
-        CARGO_CMD="cargo +nightly"
-    fi
+    TARGET_FLAG="-C target-cpu=native"
+    CARGO_CMD="cargo"
 else
     HIGHEST_ISA="SWAR (64-bit Scalar Fallback)"
     TARGET_FLAG="-C target-cpu=native"
+    CARGO_CMD="cargo"
 fi
 
 RUSTFLAGS="${RUSTFLAGS:-$TARGET_FLAG}"
@@ -128,9 +122,9 @@ fi
 
 render_context_1() {
     cat <<EOF
-================================================================================
-               CONTEXT 1: SYSTEM, CACHE & MEMORY TOPOLOGY                       
-================================================================================
+--------------------------------------------------------------------------------
+ [1/3] HARDWARE TOPOLOGY & MEMORY BANDWIDTH
+--------------------------------------------------------------------------------
 +----------------------------------+--------------------------------------------+
 | Component / Metric               | Specification / Value                      |
 +----------------------------------+--------------------------------------------+
@@ -143,19 +137,20 @@ render_context_1() {
 | STREAM Triad Best Rate           | $(printf '%-42s' "$STREAM_TRIAD_RATE") |
 | STREAM Triad Best Time           | $(printf '%-42s' "$STREAM_TRIAD_TIME") |
 +----------------------------------+--------------------------------------------+
+--------------------------------------------------------------------------------
 EOF
 }
 
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo "                   ASHWA BENCHMARK & HARDWARE PROFILING SUITE                   "
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo "Date:         $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 echo "Host:         $HOST_NAME"
 echo "Commit:       $GIT_COMMIT"
 echo "Toolchain:    $CARGO_CMD"
 echo "ISA Target:   $HIGHEST_ISA ($RUSTFLAGS)"
 echo "Pinned Core:  CPU $CPU_CORE (via taskset -c $CPU_CORE)"
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo ""
 
 render_context_1
@@ -165,36 +160,37 @@ echo ""
 # CONTEXT 2: THROUGHPUT & LATENCY BENCHMARK
 # ==============================================================================
 
-echo "================================================================================"
-echo " [2/3] RUNNING THROUGHPUT & LATENCY BENCHMARK"
+echo "--------------------------------------------------------------------------------"
+echo " [2/3] THROUGHPUT & LATENCY BENCHMARK"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 
 drop_caches() {
     sync && echo 3 | sudo -n tee /proc/sys/vm/drop_caches >/dev/null 2>&1 || true
 }
 
 drop_caches
-$CARGO_CMD bench --no-run -p ashwa --bench one_throughput >/dev/null 2>&1 || true
-taskset -c "$CPU_CORE" $CARGO_CMD bench -p ashwa --bench one_throughput -- --nocapture 2>&1 | tee "${RESULTS_DIR}/throughput_latency.log"
+$CARGO_CMD bench -q --no-run -p ashwa --bench one_throughput >/dev/null 2>&1 || true
+taskset -c "$CPU_CORE" $CARGO_CMD bench -q -p ashwa --bench one_throughput -- --nocapture 2>&1 | grep -v -E '^(Finished|Running|\s*$)' | tee "${RESULTS_DIR}/throughput_latency.log"
+echo "--------------------------------------------------------------------------------"
 echo ""
 
 # ==============================================================================
 # CONTEXT 3: INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & HARDWARE METRICS
 # ==============================================================================
 
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 echo " [3/3] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
 echo " Harness:        core/examples/one_ilp.rs"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
 echo " CPU Pinning:    Core $CPU_CORE"
-echo "================================================================================"
+echo "--------------------------------------------------------------------------------"
 
-$CARGO_CMD build --release -p ashwa --example one_ilp >/dev/null 2>&1
+$CARGO_CMD build -q --release -p ashwa --example one_ilp >/dev/null 2>&1
 ILP_BIN="./target/release/examples/one_ilp"
 [ ! -f "$ILP_BIN" ] && ILP_BIN="./target/release/one_ilp"
 
@@ -212,7 +208,6 @@ for idx in "${!TIERS[@]}"; do
     tier="${TIERS[$idx]}"
     drop_caches
 
-    # NOTE: Single-pass profiling capturing TSC cycle estimates (stdout) and hardware PMU counters (stderr)
     PERF_LOG="/tmp/ashwa_perf_${tier}.log"
     if [ "$HAS_PERF" = "true" ]; then
         ILP_RUN=$(taskset -c "$CPU_CORE" perf stat -x ';' -e instructions,cycles,task-clock,branches,branch-misses -- "$ILP_BIN" "$tier" 2>"$PERF_LOG" || true)
@@ -233,7 +228,7 @@ for idx in "${!TIERS[@]}"; do
     if [ -f "$PERF_LOG" ]; then
         perf_insn=$(awk -F';' '/instructions/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         perf_cycles=$(awk -F';' '/\<cycles\>/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
-        perf_task_clock=$(awk -F';' '/task-clock/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9.]+' || echo "")
+        perf_task_clock=$(awk -F';' '/task-clock/ {gsub(/,/, ".", $1); print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9.]+' || echo "")
         b_miss=$(awk -F';' '/branch-misses/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         b_total=$(awk -F';' '/\<branches\>/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
 
@@ -244,7 +239,13 @@ for idx in "${!TIERS[@]}"; do
         fi
 
         if [ -n "$perf_cycles" ] && [ -n "$perf_task_clock" ]; then
-            pmu_ghz=$(awk -v c="$perf_cycles" -v t="$perf_task_clock" 'BEGIN { c_num = c + 0; t_num = t + 0; if (t_num > 0 && c_num > 0) printf "%.2f GHz", (c_num / (t_num * 1e6)); else print "" }')
+            pmu_ghz=$(awk -v c="$perf_cycles" -v t="$perf_task_clock" 'BEGIN {
+                c_num = c + 0; t_num = t + 0;
+                if (t_num > 0 && c_num > 0) {
+                    ghz_val = c_num / (t_num * 1000000.0);
+                    if (ghz_val >= 0.1 && ghz_val <= 10.0) printf "%.2f GHz", ghz_val;
+                }
+            }')
             [ -n "$pmu_ghz" ] && ghz="$pmu_ghz"
         fi
 
@@ -254,6 +255,22 @@ for idx in "${!TIERS[@]}"; do
         rm -f "$PERF_LOG"
     fi
 
+    # Fallback to sysfs/lscpu clock if GHz measurement is missing or 0.00
+    if [ "$ghz" = "N/A" ] || [ "$ghz" = "0.00 GHz" ] || [ -z "$ghz" ]; then
+        freq_khz=$(cat "/sys/devices/system/cpu/cpu${CPU_CORE}/cpufreq/cpuinfo_cur_freq" 2>/dev/null || cat "/sys/devices/system/cpu/cpu${CPU_CORE}/cpufreq/scaling_cur_freq" 2>/dev/null || cat "/sys/devices/system/cpu/cpu${CPU_CORE}/cpufreq/cpuinfo_max_freq" 2>/dev/null || true)
+        if [ -n "$freq_khz" ]; then
+            ghz=$(awk -v k="$freq_khz" 'BEGIN { k_num = k + 0; if (k_num > 0) printf "%.2f GHz", k_num / 1000000.0 }')
+        fi
+    fi
+
+    if [ "$ghz" = "N/A" ] || [ "$ghz" = "0.00 GHz" ] || [ -z "$ghz" ]; then
+        cpu_mhz=$(lscpu | awk -F': +' '/CPU max MHz/ {print $2; exit} /CPU MHz/ {print $2; exit}' || true)
+        if [ -n "$cpu_mhz" ]; then
+            ghz=$(awk -v m="$cpu_mhz" 'BEGIN { m_num = m + 0; if (m_num > 0) printf "%.2f GHz", m_num / 1000.0 }')
+        fi
+    fi
+    [ -z "$ghz" ] && ghz="N/A"
+
     MAP_IPC["$tier"]="$ipc"
     MAP_GHZ["$tier"]="$ghz"
     MAP_BRANCH_MISS["$tier"]="$b_miss_pct"
@@ -261,9 +278,9 @@ done
 
 render_context_3() {
     cat <<EOF
-================================================================================
-          CONTEXT 3: INSTRUCTION-LEVEL PARALLELISM & HARDWARE METRICS           
-================================================================================
+--------------------------------------------------------------------------------
+ [3/3] INSTRUCTION-LEVEL PARALLELISM & HARDWARE METRICS
+--------------------------------------------------------------------------------
 +--------------------------+--------------------+--------------------+------------------+
 | Tier / Level             | ILP (IPC)          | CPU Frequency      | Branch Miss %    |
 +--------------------------+--------------------+--------------------+------------------+
@@ -278,6 +295,7 @@ EOF
             "${MAP_BRANCH_MISS[$tier]:-N/A}"
     done
     echo "+--------------------------+--------------------+--------------------+------------------+"
+    echo "--------------------------------------------------------------------------------"
 }
 
 render_context_3
@@ -288,20 +306,26 @@ echo ""
 # ==============================================================================
 
 {
-    echo "ASHWA CONTEXTUAL BENCHMARK REPORT"
+    echo "--------------------------------------------------------------------------------"
+    echo "                        ASHWA CONTEXTUAL BENCHMARK REPORT                       "
+    echo "--------------------------------------------------------------------------------"
     echo "Date:       $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
     echo "Host:       $HOST_NAME"
     echo "Commit:     $GIT_COMMIT"
     echo "ISA Target: $HIGHEST_ISA"
     echo "Toolchain:  $CARGO_CMD"
-    echo "================================================================================"
+    echo "--------------------------------------------------------------------------------"
     echo ""
     render_context_1
     echo ""
-    echo "[CONTEXT 2: THROUGHPUT & LATENCY]"
+    echo "--------------------------------------------------------------------------------"
+    echo " [2/3] THROUGHPUT & LATENCY BENCHMARK"
+    echo "--------------------------------------------------------------------------------"
     cat "${RESULTS_DIR}/throughput_latency.log" 2>/dev/null || true
+    echo "--------------------------------------------------------------------------------"
     echo ""
     render_context_3
 } > "$SUMMARY_FILE"
 
 echo "Complete benchmark logs saved to: $RESULTS_DIR"
+
