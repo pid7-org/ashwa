@@ -54,17 +54,29 @@ fn main() {
 
 ## Benchmarks
 
-Observed benchmarks for `search_one`,
+- [`search_one`](#search_one)
 
-| Tier         | Buffer Size | Latency   | Throughput   | IPC           |
-|:-------------|:------------|:----------|:-------------|:--------------|
-| L1 Cache     | 32 KiB      | 211.96 ns | 143.98 GiB/s | 1.99 insn/cyc |
-| L2 Cache     | 512 KiB     | 3.32 µs   | 146.94 GiB/s | 2.52 insn/cyc |
-| L3 Cache     | 16 MiB      | 563.34 µs | 27.74 GiB/s  | 0.48 insn/cyc |
-| Memory Bound | 256 MiB     | 21.96 ms  | 11.39 GiB/s  | 0.20 insn/cyc |
+### `search_one`
 
-> **NOTE:**
-> Benchmarked on an ephemeral **AWS EC2 `c6i.2xlarge`** instance (Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz, Ice Lake x86_64) pinned to an isolated CPU core with performance governor and ASLR disabled.
-> - **ISA**: AVX-512BW (512-bit vector SIMD via `cargo +nightly` with `-C target-cpu=native -C target-feature=+avx512bw,+avx512f`)
-> - **STREAM Triad Baseline**: 18.81 GB/s (19,264.97 MB/s, 12.46 ms)
-> - **Cache Topology**: L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB
+For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   | ILP           |
+|:-----------|:----------|:----------|:-------------|:--------------|
+| L1 Cache   | 32 KiB    | 211.52 ns | 144.28 GiB/s | 1.74 insn/cyc |
+| L2 Cache   | 512 KiB   | 3.32 µs   | 147.03 GiB/s | 2.53 insn/cyc |
+| L3 Cache   | 16 MiB    | 495.57 µs | 31.53 GiB/s  | 0.54 insn/cyc |
+| RAM        | 256 MiB   | 20.52 ms  | 12.18 GiB/s  | 0.21 insn/cyc |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 20.32 GB/s · 
+_+nightly_ toolchain
+
+For _aarch64_ machine targeting _NEON_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   | ILP           |
+|:-----------|:----------|:----------|:-------------|:--------------|
+| L1 Cache   | 32 KiB    | 667.79 ns | 45.70 GiB/s  | 0.51 insn/cyc |
+| L2 Cache   | 512 KiB   | 10.82 µs  | 45.14 GiB/s  | 3.23 insn/cyc |
+| L3 Cache   | 16 MiB    | 401.18 µs | 38.95 GiB/s  | 2.99 insn/cyc |
+| RAM        | 256 MiB   | 9.89 ms   | 25.28 GiB/s  | 2.02 insn/cyc |
+
+Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB · STREAM Triad: 76.50 GB/s ·
