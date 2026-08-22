@@ -430,16 +430,81 @@ unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
+#[inline(always)]
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
 unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
+    #[inline(always)]
+    unsafe fn has_match(v: uint8x16_t) -> bool {
+        let u = vreinterpretq_u64_u8(v);
+        (vgetq_lane_u64(u, 0) | vgetq_lane_u64(u, 1)) != 0
+    }
+
     let v_needle = vdupq_n_u8(needle);
 
     let mut i = 0;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
-    while i + 0x40 <= len {
+    // 128-byte unrolled vector loop (8x 16-byte Q-registers)
+    while i + 0x80 <= len {
+        let v1 = vld1q_u8(ptr.add(i));
+        let v2 = vld1q_u8(ptr.add(i + 0x10));
+        let v3 = vld1q_u8(ptr.add(i + 0x20));
+        let v4 = vld1q_u8(ptr.add(i + 0x30));
+        let v5 = vld1q_u8(ptr.add(i + 0x40));
+        let v6 = vld1q_u8(ptr.add(i + 0x50));
+        let v7 = vld1q_u8(ptr.add(i + 0x60));
+        let v8 = vld1q_u8(ptr.add(i + 0x70));
+
+        let eq1 = vceqq_u8(v1, v_needle);
+        let eq2 = vceqq_u8(v2, v_needle);
+        let eq3 = vceqq_u8(v3, v_needle);
+        let eq4 = vceqq_u8(v4, v_needle);
+        let eq5 = vceqq_u8(v5, v_needle);
+        let eq6 = vceqq_u8(v6, v_needle);
+        let eq7 = vceqq_u8(v7, v_needle);
+        let eq8 = vceqq_u8(v8, v_needle);
+
+        let or1 = vorrq_u8(eq1, eq2);
+        let or2 = vorrq_u8(eq3, eq4);
+        let or3 = vorrq_u8(eq5, eq6);
+        let or4 = vorrq_u8(eq7, eq8);
+
+        let or12 = vorrq_u8(or1, or2);
+        let or34 = vorrq_u8(or3, or4);
+        let or_all = vorrq_u8(or12, or34);
+
+        if has_match(or_all) {
+            if has_match(or12) {
+                if has_match(or1) {
+                    if has_match(eq1) {
+                        return Some(i + get_match_index_neon(eq1));
+                    }
+                    return Some(i + 0x10 + get_match_index_neon(eq2));
+                }
+                if has_match(eq3) {
+                    return Some(i + 0x20 + get_match_index_neon(eq3));
+                }
+                return Some(i + 0x30 + get_match_index_neon(eq4));
+            }
+            if has_match(or3) {
+                if has_match(eq5) {
+                    return Some(i + 0x40 + get_match_index_neon(eq5));
+                }
+                return Some(i + 0x50 + get_match_index_neon(eq6));
+            }
+            if has_match(eq7) {
+                return Some(i + 0x60 + get_match_index_neon(eq7));
+            }
+            return Some(i + 0x70 + get_match_index_neon(eq8));
+        }
+
+        i += 0x80;
+    }
+
+    // 64-byte unrolled chunk
+    if i + 0x40 <= len {
         let v1 = vld1q_u8(ptr.add(i));
         let v2 = vld1q_u8(ptr.add(i + 0x10));
         let v3 = vld1q_u8(ptr.add(i + 0x20));
@@ -452,32 +517,50 @@ unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
 
         let or1 = vorrq_u8(eq1, eq2);
         let or2 = vorrq_u8(eq3, eq4);
-        let or_vec = vorrq_u8(or1, or2);
+        let or_all = vorrq_u8(or1, or2);
 
-        if vmaxvq_u32(vreinterpretq_u32_u8(or_vec)) != 0 {
-            if vmaxvq_u32(vreinterpretq_u32_u8(eq1)) != 0 {
-                return Some(i + get_match_index_neon(eq1));
-            }
-
-            if vmaxvq_u32(vreinterpretq_u32_u8(eq2)) != 0 {
+        if has_match(or_all) {
+            if has_match(or1) {
+                if has_match(eq1) {
+                    return Some(i + get_match_index_neon(eq1));
+                }
                 return Some(i + 0x10 + get_match_index_neon(eq2));
             }
-
-            if vmaxvq_u32(vreinterpretq_u32_u8(eq3)) != 0 {
+            if has_match(eq3) {
                 return Some(i + 0x20 + get_match_index_neon(eq3));
             }
-
             return Some(i + 0x30 + get_match_index_neon(eq4));
         }
 
         i += 0x40;
     }
 
-    while i + 0x10 <= len {
+    // 32-byte chunk
+    if i + 0x20 <= len {
+        let v1 = vld1q_u8(ptr.add(i));
+        let v2 = vld1q_u8(ptr.add(i + 0x10));
+
+        let eq1 = vceqq_u8(v1, v_needle);
+        let eq2 = vceqq_u8(v2, v_needle);
+
+        let or_all = vorrq_u8(eq1, eq2);
+
+        if has_match(or_all) {
+            if has_match(eq1) {
+                return Some(i + get_match_index_neon(eq1));
+            }
+            return Some(i + 0x10 + get_match_index_neon(eq2));
+        }
+
+        i += 0x20;
+    }
+
+    // 16-byte single vector
+    if i + 0x10 <= len {
         let v = vld1q_u8(ptr.add(i));
         let eq = vceqq_u8(v, v_needle);
 
-        if vmaxvq_u32(vreinterpretq_u32_u8(eq)) != 0 {
+        if has_match(eq) {
             return Some(i + get_match_index_neon(eq));
         }
 
