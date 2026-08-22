@@ -584,7 +584,7 @@ unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
 }
 
 #[target_feature(enable = "neon")]
-#[cfg(all(target_arch = "arm", target_feature = "neon"))]
+#[cfg(all(target_arch = "arm", target_feature = "neon", target_pointer_width = "32"))]
 unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
     #[inline(always)]
     unsafe fn any_match(v: uint8x16_t) -> bool {

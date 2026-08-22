@@ -36,6 +36,17 @@ GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
 # ==============================================================================
 
 CPU_MODEL=$(lscpu | awk -F': +' '/Model name/ {print $2; exit}' || echo "Unknown CPU")
+TOTAL_THREADS=$(nproc 2>/dev/null || lscpu | awk -F': +' '/^CPU\(s\):/ {print $2; exit}' || grep -c ^processor /proc/cpuinfo 2>/dev/null || echo "N/A")
+CORES_PER_SOCKET=$(lscpu | awk -F': +' '/Core\(s\) per socket:/ {print $2; exit}' || echo "")
+SOCKETS=$(lscpu | awk -F': +' '/Socket\(s\):/ {print $2; exit}' || echo "1")
+THREADS_PER_CORE=$(lscpu | awk -F': +' '/Thread\(s\) per core:/ {print $2; exit}' || echo "1")
+
+if [ -n "$CORES_PER_SOCKET" ] && [ -n "$SOCKETS" ]; then
+    TOTAL_CORES=$((CORES_PER_SOCKET * SOCKETS))
+else
+    TOTAL_CORES="$TOTAL_THREADS"
+fi
+
 L1D_CACHE=$(lscpu | awk -F': +' '/L1d cache/ {print $2; exit}' || echo "N/A")
 L1I_CACHE=$(lscpu | awk -F': +' '/L1i cache/ {print $2; exit}' || echo "N/A")
 L2_CACHE=$(lscpu  | awk -F': +' '/L2 cache/ {print $2; exit}' || echo "N/A")
@@ -129,6 +140,8 @@ render_context_1() {
 | Component / Metric               | Specification / Value                      |
 +----------------------------------+--------------------------------------------+
 | CPU Model                        | $(printf '%-42s' "$CPU_MODEL") |
+| CPU Topology                     | $(printf '%-42s' "$TOTAL_CORES Cores / $TOTAL_THREADS Threads (vCPUs)") |
+| Threads Per Core                 | $(printf '%-42s' "$THREADS_PER_CORE") |
 | Highest Available ISA            | $(printf '%-42s' "$HIGHEST_ISA") |
 | L1 Data Cache (L1d)              | $(printf '%-42s' "$L1D_CACHE") |
 | L1 Instruction Cache (L1i)       | $(printf '%-42s' "$L1I_CACHE") |
@@ -147,6 +160,8 @@ echo "--------------------------------------------------------------------------
 echo "Date:         $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 echo "Host:         $HOST_NAME"
 echo "Commit:       $GIT_COMMIT"
+echo "CPU Model:    $CPU_MODEL"
+echo "CPU Cores:    $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
 echo "Toolchain:    $CARGO_CMD"
 echo "ISA Target:   $HIGHEST_ISA ($RUSTFLAGS)"
 echo "Pinned Core:  CPU $CPU_CORE (via taskset -c $CPU_CORE)"
@@ -312,6 +327,8 @@ echo ""
     echo "Date:       $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
     echo "Host:       $HOST_NAME"
     echo "Commit:     $GIT_COMMIT"
+    echo "CPU Model:  $CPU_MODEL"
+    echo "CPU Cores:  $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
     echo "ISA Target: $HIGHEST_ISA"
     echo "Toolchain:  $CARGO_CMD"
     echo "--------------------------------------------------------------------------------"
