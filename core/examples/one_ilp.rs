@@ -63,7 +63,15 @@ fn estimate_instructions_per_search(size: usize) -> u64 {
         num_64b_blocks * 13 + 4
     }
 
-    #[cfg(not(target_arch = "x86_64"))]
+    #[cfg(target_arch = "aarch64")]
+    {
+        // ARM NEON loop unrolls 64 bytes per iteration:
+        // 4 x vld1q_u8 + 4 x vceqq_u8 + 3 x vorrq_u8 + 1 x vreinterpret + 1 x vmaxvq + 1 x branch/loop = 12 instructions per 64-byte block
+        let num_64b_blocks = (size / 64) as u64;
+        num_64b_blocks * 12 + 4
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     {
         (size as u64 / 32) * 8 + 4
     }
