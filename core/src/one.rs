@@ -432,7 +432,6 @@ unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
 
 #[inline(always)]
 #[cfg(target_arch = "aarch64")]
-#[target_feature(enable = "neon")]
 unsafe fn search_one_neon(haystack: &[u8], needle: u8) -> Option<usize> {
     #[inline(always)]
     unsafe fn has_match(v: uint8x16_t) -> bool {

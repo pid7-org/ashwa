@@ -233,6 +233,7 @@ for idx in "${!TIERS[@]}"; do
     if [ -f "$PERF_LOG" ]; then
         perf_insn=$(awk -F';' '/instructions/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         perf_cycles=$(awk -F';' '/\<cycles\>/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
+        perf_task_clock=$(awk -F';' '/task-clock/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9.]+' || echo "")
         b_miss=$(awk -F';' '/branch-misses/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
         b_total=$(awk -F';' '/\<branches\>/ {print $1}' "$PERF_LOG" | tr -d ' ' | grep -o -E '^[0-9]+' || echo "")
 
@@ -240,6 +241,11 @@ for idx in "${!TIERS[@]}"; do
         if [ -n "$perf_insn" ] && [ -n "$perf_cycles" ]; then
             pmu_ipc=$(awk -v i="$perf_insn" -v c="$perf_cycles" 'BEGIN { c_num = c + 0; i_num = i + 0; if (c_num > 0) printf "%.2f insn/cyc", i_num / c_num; else print "" }')
             [ -n "$pmu_ipc" ] && ipc="$pmu_ipc"
+        fi
+
+        if [ -n "$perf_cycles" ] && [ -n "$perf_task_clock" ]; then
+            pmu_ghz=$(awk -v c="$perf_cycles" -v t="$perf_task_clock" 'BEGIN { c_num = c + 0; t_num = t + 0; if (t_num > 0 && c_num > 0) printf "%.2f GHz", (c_num / (t_num * 1e6)); else print "" }')
+            [ -n "$pmu_ghz" ] && ghz="$pmu_ghz"
         fi
 
         if [ -n "$b_miss" ] && [ -n "$b_total" ]; then
