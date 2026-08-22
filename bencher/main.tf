@@ -21,13 +21,26 @@ provider "aws" {
   profile = var.aws_profile
 }
 
+locals {
+  is_arm                = var.arch == "aarch64" || var.arch == "arm64"
+  arch_norm             = local.is_arm ? "aarch64" : "x86_64"
+  default_instance_type = local.is_arm ? "m7g.4xlarge" : "m6i.4xlarge"
+  instance_type         = var.instance_type != "" ? var.instance_type : local.default_instance_type
+  key_file_path         = var.ssh_key_path != "" ? var.ssh_key_path : "${path.module}/id_ed25519_${local.arch_norm}"
+}
+
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+    values = [local.is_arm ? "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-arm64-server-*" : "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = [local.is_arm ? "arm64" : "x86_64"]
   }
 
   filter {
@@ -42,8 +55,8 @@ data "aws_vpc" "default" {
 
 # NOTE: Ephemeral security group allowing SSH for runner communication
 resource "aws_security_group" "bench" {
-  name_prefix = "ashwa-bench-sg-"
-  description = "Security group for ephemeral Ashwa benchmark instance"
+  name_prefix = "ashwa-bench-sg-${local.arch_norm}-"
+  description = "Security group for ephemeral Ashwa benchmark instance (${local.arch_norm})"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
@@ -63,7 +76,7 @@ resource "aws_security_group" "bench" {
   }
 
   tags = {
-    Name = "ashwa-bench-sg"
+    Name = "ashwa-bench-sg-${local.arch_norm}"
   }
 }
 
@@ -73,19 +86,19 @@ resource "tls_private_key" "ssh" {
 }
 
 resource "aws_key_pair" "bench" {
-  key_name_prefix = "ashwa-bench-key-"
+  key_name_prefix = "ashwa-bench-key-${local.arch_norm}-"
   public_key      = tls_private_key.ssh.public_key_openssh
 }
 
 resource "local_file" "private_key" {
   content         = tls_private_key.ssh.private_key_openssh
-  filename        = "${path.module}/id_ed25519"
+  filename        = local.key_file_path
   file_permission = "0600"
 }
 
 resource "aws_instance" "bench" {
   ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.instance_type
+  instance_type               = local.instance_type
   key_name                    = aws_key_pair.bench.key_name
   vpc_security_group_ids      = [aws_security_group.bench.id]
   associate_public_ip_address = true
@@ -109,7 +122,8 @@ resource "aws_instance" "bench" {
               EOF
 
   tags = {
-    Name        = "ashwa-bench-runner"
+    Name        = "ashwa-bench-runner-${local.arch_norm}"
     Environment = "ephemeral-bench"
+    Arch        = local.arch_norm
   }
 }

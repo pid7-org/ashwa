@@ -1,6 +1,16 @@
+output "architecture" {
+  value       = local.arch_norm
+  description = "Target architecture of the runner instance"
+}
+
 output "instance_id" {
   value       = aws_instance.bench.id
   description = "The EC2 Instance ID"
+}
+
+output "instance_type" {
+  value       = aws_instance.bench.instance_type
+  description = "The EC2 Instance Type"
 }
 
 output "public_ip" {

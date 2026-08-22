@@ -70,9 +70,14 @@ elif grep -q "\bssse3\b" /proc/cpuinfo 2>/dev/null; then
 elif grep -q "\bsse2\b" /proc/cpuinfo 2>/dev/null; then
     HIGHEST_ISA="SSE2 (128-bit SIMD)"
     TARGET_FLAG="-C target-cpu=native"
-elif grep -q "\bneon\b" /proc/cpuinfo 2>/dev/null; then
+elif [ "$(uname -m 2>/dev/null)" = "aarch64" ] || [ "$(uname -m 2>/dev/null)" = "arm64" ] || grep -q -E "\b(asimd|neon)\b" /proc/cpuinfo 2>/dev/null; then
     HIGHEST_ISA="ARM NEON (128-bit SIMD)"
-    TARGET_FLAG="-C target-cpu=native"
+    TARGET_FLAG="-C target-cpu=native -C target-feature=+neon"
+    if command -v rustup >/dev/null 2>&1 && rustup toolchain list 2>/dev/null | grep -q nightly; then
+        CARGO_CMD="cargo +nightly"
+    elif cargo +nightly --version >/dev/null 2>&1; then
+        CARGO_CMD="cargo +nightly"
+    fi
 else
     HIGHEST_ISA="SWAR (64-bit Scalar Fallback)"
     TARGET_FLAG="-C target-cpu=native"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-# bench-aws: Ephemeral AWS Benchmark Orchestrator for Ashwa
+# bench-aws: Ephemeral AWS Benchmark Orchestrator for Ashwa (x86_64 & aarch64)
 # ==============================================================================
 
 set -euo pipefail
@@ -12,10 +12,15 @@ RESULTS_DIR="${SCRIPT_DIR}/results"
 
 AWS_PROFILE_ARG=""
 REGION="us-east-1"
-INSTANCE_TYPE="c6i.2xlarge"
+TARGET_ARCH="x86_64"
+USER_INSTANCE_TYPE=""
 USE_SPOT="true"
 CPU_CORE=2
 KEEP_ALIVE="false"
+
+# Defaults strictly configured for 64 GiB RAM and <= 16 vCPUs
+DEFAULT_X86_INSTANCE="m6i.4xlarge"  # 16 vCPUs, 64 GiB RAM (Intel Ice Lake AVX-512BW)
+DEFAULT_ARM_INSTANCE="m7g.4xlarge"  # 16 vCPUs, 64 GiB RAM (AWS Graviton3 ARM NEON)
 
 CURRENT_REF=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -30,17 +35,24 @@ usage() {
     cat <<EOF
 Usage: ./bench-aws [profile] [options]
 
-Ephemeral AWS EC2 Spot benchmark orchestrator for Ashwa. Provisions a dedicated instance,
-executes microarchitectural vector benchmarks on the highest available ISA with pinned CPU cores,
-collects artifacts, and tears down cloud resources automatically.
+Ephemeral AWS EC2 Spot benchmark orchestrator for Ashwa. Provisions dedicated
+x86_64 and/or aarch64 instances (64 GiB RAM, <= 16 vCPUs), executes hardware-accelerated
+microarchitectural vector benchmarks (AVX-512BW / AVX2 / NEON) with CPU pinning,
+collects artifacts, and automatically tears down cloud resources.
 
 Arguments:
   profile                   AWS CLI profile name (default: \$AWS_PROFILE or 'default')
 
 Options:
+  -a, --arch <arch>         Target architecture: 'x86_64', 'aarch64', or 'all'/'parallel' (default: x86_64)
+      --aarch64, --arm64    Run benchmark on aarch64 (AWS Graviton3 with ARM NEON)
+      --x86_64, --x64       Run benchmark on x86_64 (Intel Xeon Ice Lake with AVX-512BW)
+      --parallel, --all     Run BOTH x86_64 and aarch64 benchmarks concurrently in parallel
+  -i, --instance <type>     Override EC2 Instance Type:
+                              - x86_64 default:  m6i.4xlarge (16 vCPUs, 64 GiB RAM)
+                              - aarch64 default: m7g.4xlarge (16 vCPUs, 64 GiB RAM)
   -p, --profile <name>      AWS CLI profile name
   -r, --region <region>     AWS Region (default: us-east-1)
-  -i, --instance <type>     EC2 Instance Type (default: c6i.2xlarge - Ice Lake with AVX-512BW)
   -b, --ref <git-ref>       Git branch, tag, or commit hash (default: current HEAD '$CURRENT_REF')
   -c, --core <id>           CPU core to pin benchmark process to (default: 2)
   --on-demand               Use On-Demand instance instead of Spot instance
@@ -55,6 +67,22 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             usage
             ;;
+        -a|--arch|--architecture)
+            TARGET_ARCH="$2"
+            shift 2
+            ;;
+        --aarch64|--arm64)
+            TARGET_ARCH="aarch64"
+            shift
+            ;;
+        --x86_64|--x64|--amd64)
+            TARGET_ARCH="x86_64"
+            shift
+            ;;
+        --parallel|--all|--both)
+            TARGET_ARCH="all"
+            shift
+            ;;
         -p|--profile)
             AWS_PROFILE_ARG="$2"
             shift 2
@@ -64,7 +92,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -i|--instance|--instance-type)
-            INSTANCE_TYPE="$2"
+            USER_INSTANCE_TYPE="$2"
             shift 2
             ;;
         -b|--ref|--branch)
@@ -88,7 +116,13 @@ while [[ $# -gt 0 ]]; do
             usage
             ;;
         *)
-            if [ -z "$AWS_PROFILE_ARG" ]; then
+            if [[ "$1" =~ ^(x86_64|x64|amd64|aarch64|arm64|all|both|parallel)$ ]]; then
+                case "$1" in
+                    x86_64|x64|amd64) TARGET_ARCH="x86_64" ;;
+                    aarch64|arm64) TARGET_ARCH="aarch64" ;;
+                    all|both|parallel) TARGET_ARCH="all" ;;
+                esac
+            elif [ -z "$AWS_PROFILE_ARG" ]; then
                 AWS_PROFILE_ARG="$1"
             fi
             shift
@@ -137,15 +171,6 @@ fi
 
 [ -n "$EFFECTIVE_PROFILE" ] && export AWS_PROFILE="$EFFECTIVE_PROFILE"
 
-TF_VAR_ARGS=(
-    "-var=aws_region=$REGION"
-    "-var=instance_type=$INSTANCE_TYPE"
-    "-var=use_spot=$USE_SPOT"
-    "-var=git_ref=$GIT_REF"
-    "-var=cpu_core=$CPU_CORE"
-)
-[ -n "$EFFECTIVE_PROFILE" ] && TF_VAR_ARGS+=("-var=aws_profile=$EFFECTIVE_PROFILE")
-
 for tool in terraform ssh scp git; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "Error: Required dependency '$tool' not found in PATH."
@@ -153,12 +178,43 @@ for tool in terraform ssh scp git; do
     fi
 done
 
-# NOTE: Ephemeral teardown trap guarantees cloud destruction even on SIGINT/SIGTERM
+# Architecture resolution
+declare -a EXEC_ARCHES=()
+case "$TARGET_ARCH" in
+    x86_64|x64|amd64)
+        EXEC_ARCHES=("x86_64")
+        ;;
+    aarch64|arm64)
+        EXEC_ARCHES=("aarch64")
+        ;;
+    all|both|parallel)
+        EXEC_ARCHES=("x86_64" "aarch64")
+        ;;
+    *)
+        echo "Error: Invalid architecture '$TARGET_ARCH'. Choose 'x86_64', 'aarch64', or 'all'."
+        exit 1
+        ;;
+esac
+
+get_instance_type_for_arch() {
+    local arch="$1"
+    if [ -n "$USER_INSTANCE_TYPE" ]; then
+        echo "$USER_INSTANCE_TYPE"
+    elif [ "$arch" = "aarch64" ] || [ "$arch" = "arm64" ]; then
+        echo "$DEFAULT_ARM_INSTANCE"
+    else
+        echo "$DEFAULT_X86_INSTANCE"
+    fi
+}
+
+# NOTE: Ephemeral teardown trap guarantees cloud destruction across all provisioned architectures
 cleanup() {
     local exit_code=$?
+    trap - EXIT INT TERM
+
     if [ "$KEEP_ALIVE" = "true" ]; then
         echo ""
-        echo "[!] --keep-alive specified. Retaining instance for post-mortem debugging."
+        echo "[!] --keep-alive specified. Retaining instance(s) for post-mortem debugging."
         return $exit_code
     fi
 
@@ -166,58 +222,95 @@ cleanup() {
     echo "================================================================================"
     echo "  [TEARDOWN] Destroying ephemeral cloud infrastructure...                       "
     echo "================================================================================"
-    
+
     cd "$TERRAFORM_DIR"
-    terraform destroy -auto-approve "${TF_VAR_ARGS[@]}" || true
-    
-    rm -f id_ed25519 id_ed25519.pub
+    for arch in "${EXEC_ARCHES[@]}"; do
+        local state_file="${TERRAFORM_DIR}/terraform_${arch}.tfstate"
+        local inst_type
+        inst_type=$(get_instance_type_for_arch "$arch")
+
+        if [ -f "$state_file" ]; then
+            echo "  [TEARDOWN] Destroying $arch runner ($inst_type)..."
+            local tf_destroy_args=(
+                "-state=$state_file"
+                "-var=arch=$arch"
+                "-var=aws_region=$REGION"
+                "-var=instance_type=$inst_type"
+                "-var=use_spot=$USE_SPOT"
+                "-var=git_ref=$GIT_REF"
+                "-var=cpu_core=$CPU_CORE"
+                "-var=ssh_key_path=${TERRAFORM_DIR}/id_ed25519_${arch}"
+            )
+            [ -n "$EFFECTIVE_PROFILE" ] && tf_destroy_args+=("-var=aws_profile=$EFFECTIVE_PROFILE")
+            terraform destroy -auto-approve "${tf_destroy_args[@]}" >/dev/null 2>&1 || true
+            rm -f "$state_file" "${state_file}.backup" "${TERRAFORM_DIR}/id_ed25519_${arch}"
+        fi
+    done
+
+    # Cleanup default state/key if present
+    if [ -f "${TERRAFORM_DIR}/terraform.tfstate" ] && [ -s "${TERRAFORM_DIR}/terraform.tfstate" ]; then
+        terraform destroy -auto-approve >/dev/null 2>&1 || true
+        rm -f "${TERRAFORM_DIR}/id_ed25519" "${TERRAFORM_DIR}/id_ed25519.pub"
+    fi
+
     echo "  [TEARDOWN] Cleanup complete."
-    
     return $exit_code
 }
 
 trap cleanup EXIT INT TERM
 
-echo "================================================================================"
-echo "                     ASHWA AWS BENCHMARK ORCHESTRATOR                           "
-echo "================================================================================"
-echo " Profile:       ${EFFECTIVE_PROFILE:-<environment credentials>}"
-echo " Region:        $REGION"
-echo " Instance Type: $INSTANCE_TYPE"
-echo " Lifecycle:     $([ "$USE_SPOT" = "true" ] && echo "Spot" || echo "On-Demand")"
-echo " Git Ref:       $GIT_REF"
-echo " Pinned Core:   CPU $CPU_CORE"
-echo "================================================================================"
-echo ""
+run_single_benchmark() {
+    local arch="$1"
+    local inst_type
+    inst_type=$(get_instance_type_for_arch "$arch")
+    local state_file="${TERRAFORM_DIR}/terraform_${arch}.tfstate"
+    local ssh_key="${TERRAFORM_DIR}/id_ed25519_${arch}"
+    local arch_results_dir="${RESULTS_DIR}/${arch}"
+    local log_prefix="[$arch]"
 
-cd "$TERRAFORM_DIR"
-terraform init -input=false
-terraform apply -auto-approve "${TF_VAR_ARGS[@]}"
+    log() {
+        echo "$log_prefix $*"
+    }
 
-PUBLIC_IP=$(terraform output -raw public_ip)
-SSH_KEY="${TERRAFORM_DIR}/id_ed25519"
+    log "Starting provisioning on $arch ($inst_type, Region: $REGION, Spot: $USE_SPOT)..."
 
-chmod 600 "$SSH_KEY"
-SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $SSH_KEY"
+    local tf_args=(
+        "-state=$state_file"
+        "-var=arch=$arch"
+        "-var=aws_region=$REGION"
+        "-var=instance_type=$inst_type"
+        "-var=use_spot=$USE_SPOT"
+        "-var=git_ref=$GIT_REF"
+        "-var=cpu_core=$CPU_CORE"
+        "-var=ssh_key_path=$ssh_key"
+    )
+    [ -n "$EFFECTIVE_PROFILE" ] && tf_args+=("-var=aws_profile=$EFFECTIVE_PROFILE")
 
-echo "Provisioned instance: $PUBLIC_IP. Polling SSH readiness..."
-max_retries=60
-retry_count=0
+    cd "$TERRAFORM_DIR"
+    terraform apply -auto-approve "${tf_args[@]}" >/dev/null
 
-until ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "true" >/dev/null 2>&1; do
-    retry_count=$((retry_count + 1))
-    if [ $retry_count -ge $max_retries ]; then
-        echo "Error: Timed out waiting for SSH on $PUBLIC_IP"
-        exit 1
-    fi
+    local public_ip
+    public_ip=$(terraform output -state="$state_file" -raw public_ip)
 
-    echo -n "."
-    sleep 2
-done
-echo " Connected!"
+    chmod 600 "$ssh_key"
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $ssh_key"
 
-# NOTE: Bootstrap provisioned host with Linux PMU tools and Rust nightly (required for AVX-512 intrinsics)
-ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" bash -s -- "$GIT_REF" << 'REMOTE_BOOTSTRAP'
+    log "Provisioned instance: $public_ip. Polling SSH readiness..."
+    local max_retries=60
+    local retry_count=0
+
+    until ssh $ssh_opts "ubuntu@$public_ip" "true" >/dev/null 2>&1; do
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -ge $max_retries ]; then
+            log "Error: Timed out waiting for SSH on $public_ip"
+            return 1
+        fi
+        sleep 2
+    done
+    log "Connected via SSH!"
+
+    log "Bootstrapping remote node (toolchain, PMU tools, and repository checkout)..."
+    ssh $ssh_opts "ubuntu@$public_ip" bash -s -- "$GIT_REF" << 'REMOTE_BOOTSTRAP'
 set -euo pipefail
 TARGET_REF="$1"
 export DEBIAN_FRONTEND=noninteractive
@@ -247,21 +340,94 @@ cd "$HOME/ashwa"
 git checkout "$TARGET_REF"
 REMOTE_BOOTSTRAP
 
-# NOTE: Sync benchmark scripts to instance
-scp -r $SSH_OPTS "${TERRAFORM_DIR}/scripts" "ubuntu@$PUBLIC_IP:/home/ubuntu/"
-ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "chmod +x /home/ubuntu/scripts/run_benchmarks.sh"
+    log "Uploading benchmark scripts to remote node..."
+    scp -r $ssh_opts "${TERRAFORM_DIR}/scripts" "ubuntu@$public_ip:/home/ubuntu/" >/dev/null
+    ssh $ssh_opts "ubuntu@$public_ip" "chmod +x /home/ubuntu/scripts/run_benchmarks.sh"
+
+    log "Executing benchmark suite (Core $CPU_CORE)..."
+    ssh $ssh_opts "ubuntu@$public_ip" "CPU_CORE=$CPU_CORE /home/ubuntu/scripts/run_benchmarks.sh"
+
+    mkdir -p "$arch_results_dir"
+    scp -r $ssh_opts "ubuntu@$public_ip:/home/ubuntu/results/*" "$arch_results_dir/" >/dev/null 2>&1 || true
+
+    # Backwards compatibility: copy to root results dir if single run
+    if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
+        cp -rf "$arch_results_dir"/* "$RESULTS_DIR/" 2>/dev/null || true
+    fi
+
+    log "Benchmark complete. Results archived to $arch_results_dir"
+
+    if [ "$KEEP_ALIVE" != "true" ]; then
+        log "Tearing down $arch ephemeral instance..."
+        terraform destroy -auto-approve "${tf_args[@]}" >/dev/null 2>&1 || true
+        rm -f "$state_file" "${state_file}.backup" "$ssh_key"
+    fi
+}
 
 echo "================================================================================"
-echo "  [BENCHMARK] Executing suite on remote node...                                 "
+echo "                     ASHWA AWS BENCHMARK ORCHESTRATOR                           "
 echo "================================================================================"
-ssh $SSH_OPTS "ubuntu@$PUBLIC_IP" "CPU_CORE=$CPU_CORE /home/ubuntu/scripts/run_benchmarks.sh"
+echo " Profile:       ${EFFECTIVE_PROFILE:-<environment credentials>}"
+echo " Region:        $REGION"
+echo " Target Arch:   ${EXEC_ARCHES[*]}"
+if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
+    echo " Instance Type: $(get_instance_type_for_arch "${EXEC_ARCHES[0]}") (64 GiB RAM, <=16 vCPUs)"
+else
+    echo " Instances:     x86_64: $DEFAULT_X86_INSTANCE, aarch64: $DEFAULT_ARM_INSTANCE (both 64 GiB RAM)"
+    echo " Mode:          PARALLEL CONCURRENT EXECUTION"
+fi
+echo " Lifecycle:     $([ "$USE_SPOT" = "true" ] && echo "Spot" || echo "On-Demand")"
+echo " Git Ref:       $GIT_REF"
+echo " Pinned Core:   CPU $CPU_CORE"
+echo "================================================================================"
+echo ""
 
 mkdir -p "$RESULTS_DIR"
-scp -r $SSH_OPTS "ubuntu@$PUBLIC_IP:/home/ubuntu/results/*" "$RESULTS_DIR/" 2>/dev/null || true
+cd "$TERRAFORM_DIR"
+terraform init -input=false >/dev/null
 
-if [ -f "${RESULTS_DIR}/summary.txt" ]; then
-    echo ""
-    echo "============================= BENCHMARK SUMMARY ============================="
-    cat "${RESULTS_DIR}/summary.txt"
-    echo "============================================================================="
+if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
+    run_single_benchmark "${EXEC_ARCHES[0]}"
+else
+    echo "================================================================================"
+    echo "  [PARALLEL] Launching concurrent benchmarks on x86_64 and aarch64...           "
+    echo "================================================================================"
+    
+    PIDS=()
+    for arch in "${EXEC_ARCHES[@]}"; do
+        (
+            run_single_benchmark "$arch" 2>&1 | tee "${RESULTS_DIR}/bench-${arch}.log"
+        ) &
+        PIDS+=($!)
+    done
+
+    FAILED=0
+    for pid in "${PIDS[@]}"; do
+        wait "$pid" || FAILED=1
+    done
+
+    if [ "$FAILED" -ne 0 ]; then
+        echo ""
+        echo "Error: One or more parallel benchmark jobs encountered failures."
+        exit 1
+    fi
 fi
+
+echo ""
+echo "================================================================================"
+echo "                             BENCHMARK SUMMARY REPORTS                          "
+echo "================================================================================"
+
+for arch in "${EXEC_ARCHES[@]}"; do
+    arch_summary="${RESULTS_DIR}/${arch}/summary.txt"
+    if [ -f "$arch_summary" ]; then
+        echo ""
+        echo "========================= ARCHITECTURE: $arch ========================="
+        cat "$arch_summary"
+        echo "=========================================================================="
+    fi
+done
+
+echo ""
+echo "All benchmarks finished successfully. Artifacts available in: $RESULTS_DIR"
+

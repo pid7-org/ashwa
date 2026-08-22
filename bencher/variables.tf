@@ -1,7 +1,7 @@
 variable "aws_region" {
   type        = string
   default     = "us-east-1"
-  description = "AWS region (us-east-1 has broad availability of Ice Lake c6i instances with AVX-512BW)"
+  description = "AWS region (us-east-1 has broad availability of c6i/m6i and m7g instances)"
 }
 
 variable "aws_profile" {
@@ -10,10 +10,16 @@ variable "aws_profile" {
   description = "Optional AWS CLI profile name"
 }
 
+variable "arch" {
+  type        = string
+  default     = "x86_64"
+  description = "Target CPU architecture ('x86_64' or 'aarch64')"
+}
+
 variable "instance_type" {
   type        = string
-  default     = "c6i.2xlarge"
-  description = "EC2 instance type (Intel Xeon Ice Lake with AVX-512BW / AVX2 / SSE4.2 / SSSE3 / SSE2)"
+  default     = ""
+  description = "EC2 instance type (defaults to m6i.4xlarge for x86_64 and m7g.4xlarge for aarch64 - 64 GiB RAM, 16 vCPUs)"
 }
 
 variable "use_spot" {
@@ -44,4 +50,10 @@ variable "cpu_core" {
   type        = number
   default     = 2
   description = "CPU core ID to pin benchmarks to using taskset"
+}
+
+variable "ssh_key_path" {
+  type        = string
+  default     = ""
+  description = "Optional custom destination path for the generated private SSH key"
 }
