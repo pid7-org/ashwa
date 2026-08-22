@@ -309,24 +309,30 @@ run_single_benchmark() {
     public_ip=$(terraform output -state="$state_file" -raw public_ip)
 
     chmod 600 "$ssh_key"
-    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=5 -o ServerAliveInterval=10 -i $ssh_key"
+    local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o TCPKeepAlive=yes -i $ssh_key"
 
     log "[2/5] Polling SSH connectivity on $public_ip..."
     local max_retries=60
     local retry_count=0
+    local consecutive_success=0
 
-    until ssh $ssh_opts "ubuntu@$public_ip" "true" >/dev/null 2>&1; do
-        retry_count=$((retry_count + 1))
-        if [ $retry_count -ge $max_retries ]; then
-            log "Error: Timed out waiting for SSH on $public_ip"
-            return 1
+    while [ $consecutive_success -lt 2 ]; do
+        if ssh $ssh_opts "ubuntu@$public_ip" "true" >/dev/null 2>&1; then
+            consecutive_success=$((consecutive_success + 1))
+            sleep 1
+        else
+            consecutive_success=0
+            retry_count=$((retry_count + 1))
+            if [ $retry_count -ge $max_retries ]; then
+                log "Error: Timed out waiting for SSH on $public_ip"
+                return 1
+            fi
+            sleep 2
         fi
-        sleep 2
     done
     log "Connected via SSH!"
 
-    log "[3/5] Bootstrapping host environment ($toolchain_type toolchain)..."
-    ssh $ssh_opts "ubuntu@$public_ip" bash -s -- "$GIT_REF" "$toolchain_type" << 'REMOTE_BOOTSTRAP'
+    read -r -d '' BOOTSTRAP_SCRIPT << 'REMOTE_BOOTSTRAP' || true
 set -euo pipefail
 TARGET_REF="$1"
 TOOLCHAIN_TYPE="${2:-stable}"
@@ -363,6 +369,19 @@ if [ "${TARGET_REF,,}" = "head" ]; then
 fi
 git checkout --quiet "$TARGET_REF" || git checkout --quiet "origin/$TARGET_REF" || true
 REMOTE_BOOTSTRAP
+
+    log "[3/5] Bootstrapping host environment ($toolchain_type toolchain)..."
+    local bootstrap_retries=3
+    local bootstrap_count=0
+    until ssh $ssh_opts "ubuntu@$public_ip" bash -s -- "$GIT_REF" "$toolchain_type" <<< "$BOOTSTRAP_SCRIPT"; do
+        bootstrap_count=$((bootstrap_count + 1))
+        if [ $bootstrap_count -ge $bootstrap_retries ]; then
+            log "Error: Bootstrap failed after $bootstrap_retries attempts."
+            return 1
+        fi
+        log "SSH connection dropped during bootstrap, retrying in 3s ($bootstrap_count/$bootstrap_retries)..."
+        sleep 3
+    done
 
     log "Uploading benchmark scripts to remote node..."
     scp -r $ssh_opts "${TERRAFORM_DIR}/scripts" "ubuntu@$public_ip:/home/ubuntu/" >/dev/null
