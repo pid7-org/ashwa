@@ -130,6 +130,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Normalize and resolve git ref
+if [ "${GIT_REF,,}" = "head" ]; then
+    GIT_REF="HEAD"
+fi
+
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    RESOLVED_REF="$(git rev-parse "$GIT_REF" 2>/dev/null || true)"
+    if [ -n "$RESOLVED_REF" ]; then
+        GIT_REF="$RESOLVED_REF"
+    fi
+fi
+
 get_available_profiles() {
     {
         grep -E '^\s*\[profile ' ~/.aws/config 2>/dev/null | sed -E 's/^\s*\[profile\s+([^]]+)\]/\1/' || true
@@ -346,7 +358,10 @@ git config --global advice.detachedHead false
 rm -rf "$HOME/ashwa"
 git clone -q "https://github.com/pid7-org/ashwa.git" "$HOME/ashwa"
 cd "$HOME/ashwa"
-git checkout --quiet "$TARGET_REF"
+if [ "${TARGET_REF,,}" = "head" ]; then
+    TARGET_REF="HEAD"
+fi
+git checkout --quiet "$TARGET_REF" || git checkout --quiet "origin/$TARGET_REF" || true
 REMOTE_BOOTSTRAP
 
     log "Uploading benchmark scripts to remote node..."
