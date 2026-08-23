@@ -353,6 +353,11 @@ sudo apt-get update -y -qq >/dev/null 2>&1
 sudo apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" build-essential gcc git curl pkg-config linux-tools-common linux-tools-generic "linux-tools-$(uname -r)" >/dev/null 2>&1 || \
     sudo apt-get install -y -qq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" build-essential gcc git curl pkg-config >/dev/null 2>&1
 
+if ! command -v node >/dev/null 2>&1; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - >/dev/null 2>&1 || true
+    sudo apt-get install -y -qq nodejs >/dev/null 2>&1 || true
+fi
+
 if [ ! -f "$HOME/.cargo/env" ]; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "$TOOLCHAIN_TYPE" --profile minimal -q >/dev/null 2>&1
 fi
@@ -368,6 +373,13 @@ if [ "${TARGET_REF,,}" = "head" ]; then
     TARGET_REF="HEAD"
 fi
 git checkout --quiet "$TARGET_REF" || git checkout --quiet "origin/$TARGET_REF" || true
+
+if [ -d "$HOME/ashwa/npm" ]; then
+    cd "$HOME/ashwa/npm"
+    npm install --ignore-scripts >/dev/null 2>&1 || true
+    (cd native && cargo build --release >/dev/null 2>&1 && cp -f ../../target/release/libashwa_node.so "index.linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')-gnu.node" 2>/dev/null) || true
+    cd "$HOME/ashwa"
+fi
 REMOTE_BOOTSTRAP
 
     log "[3/5] Bootstrapping host environment ($toolchain_type toolchain)..."

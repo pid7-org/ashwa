@@ -91,6 +91,11 @@ fi
 RUSTFLAGS="${RUSTFLAGS:-$TARGET_FLAG}"
 export RUSTFLAGS
 
+NODE_VERSION="N/A"
+if command -v node >/dev/null 2>&1; then
+    NODE_VERSION=$(node --version 2>/dev/null || echo "N/A")
+fi
+
 # ==============================================================================
 # STREAM MEMORY BANDWIDTH BASELINE
 # ==============================================================================
@@ -134,7 +139,7 @@ fi
 render_context_1() {
     cat <<EOF
 --------------------------------------------------------------------------------
- [1/3] HARDWARE TOPOLOGY & MEMORY BANDWIDTH
+ [1/4] HARDWARE TOPOLOGY & MEMORY BANDWIDTH
 --------------------------------------------------------------------------------
 +----------------------------------+--------------------------------------------+
 | Component / Metric               | Specification / Value                      |
@@ -162,7 +167,7 @@ echo "Host:         $HOST_NAME"
 echo "Commit:       $GIT_COMMIT"
 echo "CPU Model:    $CPU_MODEL"
 echo "CPU Cores:    $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
-echo "Toolchain:    $CARGO_CMD"
+echo "Toolchain:    $CARGO_CMD | Node.js: $NODE_VERSION"
 echo "ISA Target:   $HIGHEST_ISA ($RUSTFLAGS)"
 echo "Pinned Core:  CPU $CPU_CORE (via taskset -c $CPU_CORE)"
 echo "--------------------------------------------------------------------------------"
@@ -172,11 +177,11 @@ render_context_1
 echo ""
 
 # ==============================================================================
-# CONTEXT 2: THROUGHPUT & LATENCY BENCHMARK
+# CONTEXT 2: RUST CORE: THROUGHPUT & LATENCY BENCHMARK
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [2/3] THROUGHPUT & LATENCY BENCHMARK"
+echo " [2/4] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
@@ -194,11 +199,61 @@ echo "--------------------------------------------------------------------------
 echo ""
 
 # ==============================================================================
-# CONTEXT 3: INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & HARDWARE METRICS
+# CONTEXT 3: NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [3/3] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
+echo " [3/4] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+echo " Node.js:        $NODE_VERSION"
+echo " Architecture:   $ARCH_UNAME"
+echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
+echo " CPU Pinning:    Core $CPU_CORE"
+echo "--------------------------------------------------------------------------------"
+
+# Ensure NPM native module is compiled for host architecture
+if [ -d "$HOME/ashwa/npm" ]; then
+    (
+        cd "$HOME/ashwa/npm"
+        if [ "$ARCH_UNAME" = "x86_64" ] && [ ! -f "native/index.linux-x64-gnu.node" ]; then
+            (cd native && $CARGO_CMD build --release >/dev/null 2>&1 || true)
+            [ -f "../target/release/libashwa_node.so" ] && cp -f "../target/release/libashwa_node.so" "native/index.linux-x64-gnu.node"
+            [ -f "../../target/release/libashwa_node.so" ] && cp -f "../../target/release/libashwa_node.so" "native/index.linux-x64-gnu.node"
+        elif [ "$ARCH_UNAME" = "aarch64" ] || [ "$ARCH_UNAME" = "arm64" ]; then
+            if [ ! -f "native/index.linux-arm64-gnu.node" ]; then
+                (cd native && $CARGO_CMD build --release >/dev/null 2>&1 || true)
+                [ -f "../target/release/libashwa_node.so" ] && cp -f "../target/release/libashwa_node.so" "native/index.linux-arm64-gnu.node"
+                [ -f "../../target/release/libashwa_node.so" ] && cp -f "../../target/release/libashwa_node.so" "native/index.linux-arm64-gnu.node"
+            fi
+        fi
+    ) || true
+fi
+
+if command -v node >/dev/null 2>&1; then
+    if [ -f "$HOME/ashwa/npm/benches/one_throughput.js" ]; then
+        echo " >> Node.js / V8 Native N-API Throughput Benchmark:"
+        drop_caches
+        taskset -c "$CPU_CORE" node "$HOME/ashwa/npm/benches/one_throughput.js" 2>&1 | tee "${RESULTS_DIR}/npm_node_throughput_latency.log"
+        echo ""
+    fi
+
+    if [ "$ARCH_UNAME" = "x86_64" ] && [ -f "$HOME/ashwa/npm/benches/wasm_throughput.js" ]; then
+        echo " >> WebAssembly SIMD128 Throughput Benchmark (x86_64 only):"
+        drop_caches
+        taskset -c "$CPU_CORE" node "$HOME/ashwa/npm/benches/wasm_throughput.js" 2>&1 | tee "${RESULTS_DIR}/npm_wasm_throughput_latency.log"
+        echo ""
+    fi
+else
+    echo " Node.js not found. Skipping NPM benchmarks."
+fi
+echo "--------------------------------------------------------------------------------"
+echo ""
+
+# ==============================================================================
+# CONTEXT 4: INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & HARDWARE METRICS
+# ==============================================================================
+
+echo "--------------------------------------------------------------------------------"
+echo " [4/4] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
 echo " Harness:        core/examples/one_ilp.rs"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
@@ -291,10 +346,10 @@ for idx in "${!TIERS[@]}"; do
     MAP_BRANCH_MISS["$tier"]="$b_miss_pct"
 done
 
-render_context_3() {
+render_context_4() {
     cat <<EOF
 --------------------------------------------------------------------------------
- [3/3] INSTRUCTION-LEVEL PARALLELISM & HARDWARE METRICS
+ [4/4] INSTRUCTION-LEVEL PARALLELISM & HARDWARE METRICS
 --------------------------------------------------------------------------------
 +--------------------------+--------------------+--------------------+------------------+
 | Tier / Level             | ILP (IPC)          | CPU Frequency      | Branch Miss %    |
@@ -313,7 +368,7 @@ EOF
     echo "--------------------------------------------------------------------------------"
 }
 
-render_context_3
+render_context_4
 echo ""
 
 # ==============================================================================
@@ -330,18 +385,33 @@ echo ""
     echo "CPU Model:  $CPU_MODEL"
     echo "CPU Cores:  $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
     echo "ISA Target: $HIGHEST_ISA"
-    echo "Toolchain:  $CARGO_CMD"
+    echo "Toolchain:  $CARGO_CMD | Node.js: $NODE_VERSION"
     echo "--------------------------------------------------------------------------------"
     echo ""
     render_context_1
     echo ""
     echo "--------------------------------------------------------------------------------"
-    echo " [2/3] THROUGHPUT & LATENCY BENCHMARK"
+    echo " [2/4] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
     echo "--------------------------------------------------------------------------------"
     cat "${RESULTS_DIR}/throughput_latency.log" 2>/dev/null || true
     echo "--------------------------------------------------------------------------------"
     echo ""
-    render_context_3
+    echo "--------------------------------------------------------------------------------"
+    echo " [3/4] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+    echo "--------------------------------------------------------------------------------"
+    if [ -f "${RESULTS_DIR}/npm_node_throughput_latency.log" ]; then
+        echo " >> Node.js / V8 Native N-API:"
+        cat "${RESULTS_DIR}/npm_node_throughput_latency.log" 2>/dev/null || true
+        echo ""
+    fi
+    if [ -f "${RESULTS_DIR}/npm_wasm_throughput_latency.log" ]; then
+        echo " >> WebAssembly SIMD128 (x86_64):"
+        cat "${RESULTS_DIR}/npm_wasm_throughput_latency.log" 2>/dev/null || true
+        echo ""
+    fi
+    echo "--------------------------------------------------------------------------------"
+    echo ""
+    render_context_4
 } > "$SUMMARY_FILE"
 
 echo "Complete benchmark logs saved to: $RESULTS_DIR"

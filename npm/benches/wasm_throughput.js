@@ -2,13 +2,15 @@
  * Ashwa Throughput & Latency Microbenchmark Suite (WebAssembly SIMD128)
  */
 
-import { readFileSync } from "fs";
-import { join } from "path";
-import { initSync, searchOne } from "../wasm/pkg/ashwa_wasm.js";
+const fs = require("fs");
+const path = require("path");
+const wasm = require("../wasm/pkg/ashwa_wasm.js");
 
-const wasmPath = join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
-const wasmBytes = readFileSync(wasmPath);
-initSync({ module: wasmBytes });
+const wasmPath = path.join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
+const wasmBytes = fs.readFileSync(wasmPath);
+wasm.initSync({ module: wasmBytes });
+
+const searchOne = wasm.searchOne;
 
 const KB = 0x400;
 const MB = KB * KB;
@@ -149,7 +151,7 @@ if (require.main === module) {
   main();
 }
 
-export default {
+module.exports = {
   benchmarkTier,
   printTable,
   TIERS,
