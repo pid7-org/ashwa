@@ -96,6 +96,11 @@ if command -v node >/dev/null 2>&1; then
     NODE_VERSION=$(node --version 2>/dev/null || echo "N/A")
 fi
 
+PYTHON_VERSION="N/A"
+if command -v python3 >/dev/null 2>&1; then
+    PYTHON_VERSION=$(python3 --version 2>/dev/null | awk '{print $2}' || echo "N/A")
+fi
+
 # ==============================================================================
 # STREAM MEMORY BANDWIDTH BASELINE
 # ==============================================================================
@@ -139,7 +144,7 @@ fi
 render_context_1() {
     cat <<EOF
 --------------------------------------------------------------------------------
- [1/4] HARDWARE TOPOLOGY & MEMORY BANDWIDTH
+ [1/5] HARDWARE TOPOLOGY & MEMORY BANDWIDTH
 --------------------------------------------------------------------------------
 +----------------------------------+--------------------------------------------+
 | Component / Metric               | Specification / Value                      |
@@ -167,7 +172,7 @@ echo "Host:         $HOST_NAME"
 echo "Commit:       $GIT_COMMIT"
 echo "CPU Model:    $CPU_MODEL"
 echo "CPU Cores:    $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
-echo "Toolchain:    $CARGO_CMD | Node.js: $NODE_VERSION"
+echo "Toolchain:    $CARGO_CMD | Node.js: $NODE_VERSION | Python: $PYTHON_VERSION"
 echo "ISA Target:   $HIGHEST_ISA ($RUSTFLAGS)"
 echo "Pinned Core:  CPU $CPU_CORE (via taskset -c $CPU_CORE)"
 echo "--------------------------------------------------------------------------------"
@@ -181,7 +186,7 @@ echo ""
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [2/4] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
+echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
@@ -203,7 +208,7 @@ echo ""
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [3/4] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
 echo " Node.js:        $NODE_VERSION"
 echo " Architecture:   $ARCH_UNAME"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
@@ -258,11 +263,51 @@ echo "--------------------------------------------------------------------------
 echo ""
 
 # ==============================================================================
-# CONTEXT 4: INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & HARDWARE METRICS
+# CONTEXT 4: PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [4/4] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
+echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+echo " Python:         $PYTHON_VERSION"
+echo " Architecture:   $ARCH_UNAME"
+echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
+echo " CPU Pinning:    Core $CPU_CORE"
+echo "--------------------------------------------------------------------------------"
+
+# Ensure Python native C-extension is compiled for host architecture
+if [ -d "$HOME/ashwa/pypi" ]; then
+    (
+        cd "$HOME/ashwa/pypi"
+        if [ ! -f "python/ashwa/ashwa.so" ] && [ ! -f "python/ashwa/ashwa.cpython-"*".so" ]; then
+            $CARGO_CMD build --release >/dev/null 2>&1 || true
+            if [ -f "../target/release/libashwa.so" ]; then
+                cp -f "../target/release/libashwa.so" "python/ashwa/ashwa.so"
+            elif [ -f "../../target/release/libashwa.so" ]; then
+                cp -f "../../target/release/libashwa.so" "python/ashwa/ashwa.so"
+            fi
+        fi
+    ) || true
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+    if [ -f "$HOME/ashwa/pypi/benches/one_throughput.py" ]; then
+        echo " >> Python / PyO3 Native C-Extension Throughput Benchmark:"
+        drop_caches
+        taskset -c "$CPU_CORE" python3 "$HOME/ashwa/pypi/benches/one_throughput.py" 2>&1 | tee "${RESULTS_DIR}/python_throughput_latency.log"
+        echo ""
+    fi
+else
+    echo " Python 3 not found. Skipping Python benchmarks."
+fi
+echo "--------------------------------------------------------------------------------"
+echo ""
+
+# ==============================================================================
+# CONTEXT 5: INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & HARDWARE METRICS
+# ==============================================================================
+
+echo "--------------------------------------------------------------------------------"
+echo " [5/5] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
 echo " Harness:        core/examples/one_ilp.rs"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
@@ -355,10 +400,10 @@ for idx in "${!TIERS[@]}"; do
     MAP_BRANCH_MISS["$tier"]="$b_miss_pct"
 done
 
-render_context_4() {
+render_context_5() {
     cat <<EOF
 --------------------------------------------------------------------------------
- [4/4] INSTRUCTION-LEVEL PARALLELISM & HARDWARE METRICS
+ [5/5] INSTRUCTION-LEVEL PARALLELISM & HARDWARE METRICS
 --------------------------------------------------------------------------------
 +--------------------------+--------------------+--------------------+------------------+
 | Tier / Level             | ILP (IPC)          | CPU Frequency      | Branch Miss %    |
@@ -377,7 +422,7 @@ EOF
     echo "--------------------------------------------------------------------------------"
 }
 
-render_context_4
+render_context_5
 echo ""
 
 # ==============================================================================
@@ -394,19 +439,19 @@ echo ""
     echo "CPU Model:  $CPU_MODEL"
     echo "CPU Cores:  $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
     echo "ISA Target: $HIGHEST_ISA"
-    echo "Toolchain:  $CARGO_CMD | Node.js: $NODE_VERSION"
+    echo "Toolchain:  $CARGO_CMD | Node.js: $NODE_VERSION | Python: $PYTHON_VERSION"
     echo "--------------------------------------------------------------------------------"
     echo ""
     render_context_1
     echo ""
     echo "--------------------------------------------------------------------------------"
-    echo " [2/4] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
+    echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
     echo "--------------------------------------------------------------------------------"
     cat "${RESULTS_DIR}/throughput_latency.log" 2>/dev/null || true
     echo "--------------------------------------------------------------------------------"
     echo ""
     echo "--------------------------------------------------------------------------------"
-    echo " [3/4] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+    echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
     echo "--------------------------------------------------------------------------------"
     if [ -f "${RESULTS_DIR}/npm_node_throughput_latency.log" ]; then
         echo " >> Node.js / V8 Native N-API:"
@@ -420,7 +465,17 @@ echo ""
     fi
     echo "--------------------------------------------------------------------------------"
     echo ""
-    render_context_4
+    echo "--------------------------------------------------------------------------------"
+    echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+    echo "--------------------------------------------------------------------------------"
+    if [ -f "${RESULTS_DIR}/python_throughput_latency.log" ]; then
+        echo " >> Python / PyO3 Native C-Extension:"
+        cat "${RESULTS_DIR}/python_throughput_latency.log" 2>/dev/null || true
+        echo ""
+    fi
+    echo "--------------------------------------------------------------------------------"
+    echo ""
+    render_context_5
 } > "$SUMMARY_FILE"
 
 echo "Complete benchmark logs saved to: $RESULTS_DIR"
