@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0] - 2026-08-23
+
+- optimize AArch64 NEON single-byte search with 256-byte loop unrolling across 16 vector registers
+- replace criterion with custom high-precision throughput, latency, and ILP profiling harness
+- add throughput benchmarks for npm (Node.js / WASM SIMD128) and Python packages
+- add automated multi-architecture AWS EC2 benchmark runner with hardware PMU profiling
+
 ## [0.1.8] - 2026-08-19
 
 - fix 32-bit i686 Linux Python wheel builds by enforcing manylinux2014 container environment
