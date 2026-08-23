@@ -1,0 +1,157 @@
+/**
+ * Ashwa Throughput & Latency Microbenchmark Suite (WebAssembly SIMD128)
+ */
+
+import { readFileSync } from "fs";
+import { join } from "path";
+import { initSync, searchOne } from "../wasm/pkg/ashwa_wasm.js";
+
+const wasmPath = join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
+const wasmBytes = readFileSync(wasmPath);
+initSync({ module: wasmBytes });
+
+const KB = 0x400;
+const MB = KB * KB;
+const SAMPLES = 0x200;
+
+const TIERS = [
+  { name: "L1 Cache", size: 0x20 * KB },
+  { name: "L2 Cache", size: 0x200 * KB },
+  { name: "L3 Cache", size: 0x10 * MB },
+  { name: "Memory Bound (RAM)", size: 0x100 * MB },
+];
+
+// Anti-DCE (Dead Code Elimination) optimization barrier sink
+let blackHole = null;
+
+function formatSize(bytes) {
+  if (bytes >= MB) {
+    return `${Math.floor(bytes / MB)} MiB`;
+  } else if (bytes >= KB) {
+    return `${Math.floor(bytes / KB)} KiB`;
+  }
+
+  return `${bytes} B`;
+}
+
+function formatLatency(secs) {
+  const nanos = secs * 1e9;
+
+  if (nanos < 0x3e8) {
+    return `${nanos.toFixed(2)} ns`;
+  } else if (nanos < 0xf4240) {
+    return `${(nanos / 0x3e8).toFixed(2)} µs`;
+  }
+
+  return `${(nanos / 0xf4240).toFixed(2)} ms`;
+}
+
+function benchmarkTier(tier, haystack, needle) {
+  const size = tier.size;
+  const slice = haystack.subarray(0, size);
+
+  // Warmup
+  const warmupStart = process.hrtime.bigint();
+  let warmupIters = 0;
+
+  while (
+    Number(process.hrtime.bigint() - warmupStart) < 0x5f5e100 || // 100ms
+    warmupIters < 0x40
+  ) {
+    blackHole = searchOne(slice, needle);
+    warmupIters++;
+  }
+
+  const probeStart = process.hrtime.bigint();
+  const probeIters = Math.max(0x14, Math.floor(warmupIters / 0xa));
+
+  for (let i = 0; i < probeIters; i++) {
+    blackHole = searchOne(slice, needle);
+  }
+
+  const probeElapsedSecs = Number(process.hrtime.bigint() - probeStart) / 1e9;
+  const timePerSingleIter = Math.max(probeElapsedSecs / probeIters, 1e-9);
+
+  const batchSize = Math.max(1, Math.round(0.001 / timePerSingleIter));
+  const sampleDurations = new Array(SAMPLES);
+
+  for (let s = 0; s < SAMPLES; s++) {
+    const sampleStart = process.hrtime.bigint();
+
+    for (let b = 0; b < batchSize; b++) {
+      blackHole = searchOne(slice, needle);
+    }
+
+    const elapsedSecs = Number(process.hrtime.bigint() - sampleStart) / 1e9;
+    sampleDurations[s] = elapsedSecs / batchSize;
+  }
+
+  sampleDurations.sort((a, b) => a - b);
+
+  const medianSecs = sampleDurations[Math.floor(sampleDurations.length / 2)];
+  const gibPerSec = size / (0x400 * 0x400 * 0x400) / medianSecs;
+
+  return {
+    name: tier.name,
+    size,
+    latencySecs: medianSecs,
+    throughputGiB: gibPerSec,
+  };
+}
+
+function printTable(results) {
+  const colTier = "Tier / Level";
+  const colSize = "Size";
+  const colLat = "Latency (Median)";
+  const colThrpt = "Throughput";
+
+  const wTier = 0x16;
+  const wSize = 0xa;
+  const wLat = 0x12;
+  const wThrpt = 0x10;
+
+  const divider = `+-${"-".repeat(wTier)}-+-${"-".repeat(wSize)}-+-${"-".repeat(wLat)}-+-${"-".repeat(wThrpt)}-+`;
+
+  console.log(divider);
+  console.log(
+    `| ${colTier.padEnd(wTier)} | ${colSize.padStart(wSize)} | ${colLat.padStart(wLat)} | ${colThrpt.padStart(wThrpt)} |`,
+  );
+  console.log(divider);
+
+  for (const r of results) {
+    console.log(
+      `| ${r.name.padEnd(wTier)} | ${formatSize(r.size).padStart(wSize)} | ${formatLatency(r.latencySecs).padStart(wLat)} | ${(r.throughputGiB.toFixed(2) + " GiB/s").padStart(wThrpt)} |`,
+    );
+  }
+
+  console.log(divider);
+}
+
+function main() {
+  const needle = 0x0a;
+  const maxSize = Math.max(...TIERS.map((t) => t.size));
+
+  const haystack = new Uint8Array(maxSize);
+
+  for (let pageOffset = 0; pageOffset < maxSize; pageOffset += 0x1000) {
+    haystack[pageOffset] = 0;
+  }
+
+  const results = [];
+  for (const tier of TIERS) {
+    results.push(benchmarkTier(tier, haystack, needle));
+  }
+
+  printTable(results);
+}
+
+if (require.main === module) {
+  main();
+}
+
+export default {
+  benchmarkTier,
+  printTable,
+  TIERS,
+  main,
+};

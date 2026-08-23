@@ -66,7 +66,9 @@
     "test": "npm run test:node && npm run test:wasm",
     "test:node": "node --test tests/node.test.js tests/node.test.mjs",
     "test:wasm": "node --test tests/wasm.test.js tests/wasm.test.mjs tests/browser.test.js",
-    "bench": "node benches/one_throughput.js"
+    "bench": "npm run bench:node && npm run bench:wasm",
+    "bench:node": "node benches/one_throughput.js",
+    "bench:wasm": "node benches/wasm_throughput.js"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.0.0",
