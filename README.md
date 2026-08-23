@@ -67,8 +67,8 @@ For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
 | L3 Cache   | 16 MiB    | 495.57 µs | 31.53 GiB/s  | 0.54 insn/cyc |
 | RAM        | 256 MiB   | 20.52 ms  | 12.18 GiB/s  | 0.21 insn/cyc |
 
-Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 20.32 GB/s · 
-_+nightly_ toolchain
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) ·
+L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 20.32 GB/s · _+nightly_ toolchain
 
 For _aarch64_ machine targeting _NEON_ SIMD ISA,
 
@@ -79,4 +79,5 @@ For _aarch64_ machine targeting _NEON_ SIMD ISA,
 | L3 Cache   | 16 MiB    | 401.18 µs | 38.95 GiB/s  | 2.99 insn/cyc |
 | RAM        | 256 MiB   | 9.89 ms   | 25.28 GiB/s  | 2.02 insn/cyc |
 
-Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB · STREAM Triad: 76.50 GB/s ·
+Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB ·
+STREAM Triad: 76.50 GB/s

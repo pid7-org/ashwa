@@ -54,3 +54,49 @@ await init();
 
 const index = searchOne(haystack, needle);
 ```
+
+## Benchmarks
+
+- [`searchOne`](#searchone)
+
+### `searchOne`
+
+#### Native Node.js (V8 N-API)
+
+For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 640.15 ns | 47.67 GiB/s  |
+| L2 Cache   | 512 KiB   | 10.07 µs  | 48.51 GiB/s  |
+| L3 Cache   | 16 MiB    | 540.35 µs | 28.92 GiB/s  |
+| RAM        | 256 MiB   | 23.88 ms  | 10.47 GiB/s  |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB ·
+STREAM Triad: 20.63 GB/s · Node.js v22.23.2
+
+For _aarch64_ machine targeting _NEON_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 743.33 ns | 41.06 GiB/s  |
+| L2 Cache   | 512 KiB   | 11.25 µs  | 43.42 GiB/s  |
+| L3 Cache   | 16 MiB    | 381.99 µs | 40.90 GiB/s  |
+| RAM        | 256 MiB   | 9.96 ms   | 25.10 GiB/s  |
+
+Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB ·
+STREAM Triad: 75.12 GB/s · Node.js v22.23.2
+
+#### WebAssembly (WASM SIMD128)
+
+For _x86_64_ machine targeting _WASM SIMD128_ ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 1.62 µs   | 18.79 GiB/s  |
+| L2 Cache   | 512 KiB   | 26.81 µs  | 18.21 GiB/s  |
+| L3 Cache   | 16 MiB    | 1.81 ms   | 8.63 GiB/s   |
+| RAM        | 256 MiB   | 44.63 ms  | 5.60 GiB/s   |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) ·
+L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 20.63 GB/s · Node.js v22.23.2
