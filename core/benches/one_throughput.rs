@@ -38,6 +38,7 @@ fn format_size(bytes: usize) -> String {
 
 fn format_latency(secs: f64) -> String {
     let nanos = secs * 1e9;
+
     if nanos < 1_000.0 {
         format!("{:.2} ns", nanos)
     } else if nanos < 1_000_000.0 {
@@ -51,31 +52,33 @@ fn benchmark_tier(tier: &TierConfig, haystack: &[u8], needle: u8) -> BenchResult
     let size = tier.size;
     let slice = &haystack[..size];
 
-    // Warmup phase
+    // Warmup
     let warmup_start = Instant::now();
     let mut warmup_iters = 0usize;
+
     while warmup_start.elapsed() < Duration::from_millis(100) || warmup_iters < 64 {
         black_box(search_one(black_box(slice), black_box(needle)));
         warmup_iters += 1;
     }
 
-    // Probe phase to estimate per-iteration time
     let probe_start = Instant::now();
     let probe_iters = 20.max(warmup_iters / 10);
+
     for _ in 0..probe_iters {
         black_box(search_one(black_box(slice), black_box(needle)));
     }
+
     let probe_elapsed = probe_start.elapsed().as_secs_f64();
     let time_per_single_iter = (probe_elapsed / probe_iters as f64).max(1e-9);
     let batch_size = ((0.001 / time_per_single_iter).round() as usize).max(1);
 
-    // Measurement phase
     let mut sample_durations = Vec::with_capacity(SAMPLES);
     for _ in 0..SAMPLES {
         let sample_start = Instant::now();
         for _ in 0..batch_size {
             black_box(search_one(black_box(slice), black_box(needle)));
         }
+
         let elapsed = sample_start.elapsed();
         let per_iter_secs = elapsed.as_secs_f64() / (batch_size as f64);
         sample_durations.push(per_iter_secs);
@@ -85,12 +88,7 @@ fn benchmark_tier(tier: &TierConfig, haystack: &[u8], needle: u8) -> BenchResult
     let median_secs = sample_durations[sample_durations.len() / 2];
     let gib_per_sec = (size as f64 / (1024.0 * 1024.0 * 1024.0)) / median_secs;
 
-    BenchResult {
-        name: tier.name,
-        size,
-        latency_secs: median_secs,
-        throughput_gib: gib_per_sec,
-    }
+    BenchResult { name: tier.name, size, latency_secs: median_secs, throughput_gib: gib_per_sec }
 }
 
 fn print_table(results: &[BenchResult]) {
@@ -106,7 +104,10 @@ fn print_table(results: &[BenchResult]) {
 
     let divider = format!(
         "+-{:-<w_tier$}-+-{:-<w_size$}-+-{:-<w_lat$}-+-{:-<w_thrpt$}-+",
-        "", "", "", "",
+        "",
+        "",
+        "",
+        "",
         w_tier = w_tier,
         w_size = w_size,
         w_lat = w_lat,
@@ -116,7 +117,10 @@ fn print_table(results: &[BenchResult]) {
     println!("{}", divider);
     println!(
         "| {:<w_tier$} | {:>w_size$} | {:>w_lat$} | {:>w_thrpt$} |",
-        col_tier, col_size, col_lat, col_thrpt,
+        col_tier,
+        col_size,
+        col_lat,
+        col_thrpt,
         w_tier = w_tier,
         w_size = w_size,
         w_lat = w_lat,
@@ -152,7 +156,6 @@ fn main() {
         panic!("failed to allocate benchmark buffer");
     }
 
-    // Touch every page to ensure allocation is resident in physical memory
     for page_offset in (0..max_size).step_by(4096) {
         unsafe { std::ptr::write_volatile(ptr.add(page_offset), 0) };
     }

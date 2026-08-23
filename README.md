@@ -18,13 +18,13 @@ Hardware accelerated routines for single substring search
 
 ## Supported Platforms
 
-| Architecture        | Target Platform                              | Hardware Acceleration                | Fallback    |
-|:--------------------|:---------------------------------------------|:-------------------------------------|:------------|
-| **x86_64**          | Linux, macOS, Windows, Android, FreeBSD      | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2 | 64-bit SWAR |
-| **x86 (i686)**      | Windows, Linux                               | SSE2                                 | 32-bit SWAR |
-| **AArch64 (ARM64)** | Apple Silicon, Linux ARM64, Android, FreeBSD | 128-bit ARM NEON                     | 64-bit SWAR |
-| **ARMv7**           | Linux ARM, Android                           | 128-bit ARM NEON                     | 32-bit SWAR |
-| **WebAssembly**     | Browsers, Node.js (wasm32)                   | WASM SIMD128 (simd128)               | 32-bit SWAR |
+| Architecture    | Target Platform                              | Hardware Acceleration                | Fallback    |
+|:----------------|:---------------------------------------------|:-------------------------------------|:------------|
+| x86_64          | Linux, macOS, Windows, Android, FreeBSD      | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2 | 64-bit SWAR |
+| x86 (i686)      | Windows, Linux                               | SSE2                                 | 32-bit SWAR |
+| AArch64 (ARM64) | Apple Silicon, Linux ARM64, Android, FreeBSD | 128-bit ARM NEON                     | 64-bit SWAR |
+| ARMv7           | Linux ARM, Android                           | 128-bit ARM NEON                     | 32-bit SWAR |
+| WebAssembly     | Browsers, Node.js (wasm32)                   | WASM SIMD128 (simd128)               | 32-bit SWAR |
 
 ## Usage
 

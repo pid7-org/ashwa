@@ -7,17 +7,20 @@
 
 Hardware accelerated routines for single substring search
 
-> **NOTE:**
-> `@pid7/ashwa` is supported in both Node.js and browser environments. The optimal backend (native SIMD bindings for
-> Node / Bun / Deno or WebAssembly SIMD for browsers) is automatically selected at runtime.
+> [!TIP]
+> Package is supported in both Node.js and browser environments.
+
+> [!NOTE]
+> The optimal backend (native SIMD bindings for Node / Bun / Deno or WebAssembly SIMD for browsers) is
+> automatically selected at runtime.
 
 ## Supported Platforms
 
-| Architecture        | Target Platform                              | Hardware Acceleration                | Fallback    |
-|:--------------------|:---------------------------------------------|:-------------------------------------|:------------|
-| **x86_64**          | Linux, macOS, Windows                        | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2 | 64-bit SWAR |
-| **AArch64 (ARM64)** | Apple Silicon, Linux ARM64                   | 128-bit ARM NEON                     | 64-bit SWAR |
-| **WebAssembly**     | Browsers, Node.js (`wasm32`)                 | WASM SIMD128 (`simd128`)             | 32-bit SWAR |
+| Architecture    | Target Platform                              | Hardware Acceleration                | Fallback    |
+|:----------------|:---------------------------------------------|:-------------------------------------|:------------|
+| x86_64          | Linux, macOS, Windows                        | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2 | 64-bit SWAR |
+| AArch64 (ARM64) | Apple Silicon, Linux ARM64                   | 128-bit ARM NEON                     | 64-bit SWAR |
+| WebAssembly     | Browsers, Node.js (`wasm32`)                 | WASM SIMD128 (`simd128`)             | 32-bit SWAR |
 
 ## Usage
 
