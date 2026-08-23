@@ -365,6 +365,10 @@ fi
 source "$HOME/.cargo/env"
 rustup default "$TOOLCHAIN_TYPE" >/dev/null 2>&1 || true
 
+if ! command -v wasm-pack >/dev/null 2>&1; then
+    curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh -s -- -y >/dev/null 2>&1 || true
+fi
+
 git config --global advice.detachedHead false
 rm -rf "$HOME/ashwa"
 git clone -q "https://github.com/pid7-org/ashwa.git" "$HOME/ashwa"
@@ -378,6 +382,9 @@ if [ -d "$HOME/ashwa/npm" ]; then
     cd "$HOME/ashwa/npm"
     npm install --ignore-scripts >/dev/null 2>&1 || true
     (cd native && cargo build --release >/dev/null 2>&1 && cp -f ../../target/release/libashwa_node.so "index.linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')-gnu.node" 2>/dev/null) || true
+    if command -v wasm-pack >/dev/null 2>&1; then
+        npm run build:wasm >/dev/null 2>&1 || true
+    fi
     cd "$HOME/ashwa"
 fi
 REMOTE_BOOTSTRAP

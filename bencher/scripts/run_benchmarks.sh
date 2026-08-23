@@ -237,10 +237,19 @@ if command -v node >/dev/null 2>&1; then
     fi
 
     if [ "$ARCH_UNAME" = "x86_64" ] && [ -f "$HOME/ashwa/npm/benches/wasm_throughput.js" ]; then
-        echo " >> WebAssembly SIMD128 Throughput Benchmark (x86_64 only):"
-        drop_caches
-        taskset -c "$CPU_CORE" node "$HOME/ashwa/npm/benches/wasm_throughput.js" 2>&1 | tee "${RESULTS_DIR}/npm_wasm_throughput_latency.log"
-        echo ""
+        if [ ! -f "$HOME/ashwa/npm/wasm/pkg/ashwa_wasm.js" ] && command -v wasm-pack >/dev/null 2>&1; then
+            (cd "$HOME/ashwa/npm" && npm run build:wasm >/dev/null 2>&1 || true)
+        fi
+
+        if [ -f "$HOME/ashwa/npm/wasm/pkg/ashwa_wasm.js" ] && [ -f "$HOME/ashwa/npm/wasm/pkg/ashwa_wasm_bg.wasm" ]; then
+            echo " >> WebAssembly SIMD128 Throughput Benchmark (x86_64 only):"
+            drop_caches
+            taskset -c "$CPU_CORE" node "$HOME/ashwa/npm/benches/wasm_throughput.js" 2>&1 | tee "${RESULTS_DIR}/npm_wasm_throughput_latency.log"
+            echo ""
+        else
+            echo " >> WebAssembly SIMD128 package not available. Skipping WASM benchmark."
+            echo ""
+        fi
     fi
 else
     echo " Node.js not found. Skipping NPM benchmarks."
