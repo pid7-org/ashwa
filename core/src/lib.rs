@@ -28,6 +28,7 @@ compile_error!("ashwa is only supported on 64 and 32 bit targets");
 #[cfg(all(target_arch = "x86_64"))]
 use core::{arch::x86_64, sync::atomic};
 
+mod common;
 mod one;
 
 pub use one::search_one;
