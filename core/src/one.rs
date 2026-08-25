@@ -63,7 +63,7 @@ use core::arch::aarch64::*;
 #[cfg(target_pointer_width = "64")]
 use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
 
-#[cfg(target_pointer_width = "32")]
+#[cfg(any(target_pointer_width = "32", test))]
 use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
 
 /// Searches for the first occurrence of a single byte (`needle`) in a byte slice (`haystack`)
@@ -216,7 +216,7 @@ fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
 }
 
 #[inline(always)]
-#[cfg(target_pointer_width = "32")]
+#[cfg(any(target_pointer_width = "32", test))]
 fn search_one_swar32(haystack: &[u8], needle: u8) -> Option<usize> {
     let needle_word = (needle as u32).wrapping_mul(LSB32);
 
@@ -936,7 +936,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_pointer_width = "32")]
+    #[cfg(any(target_pointer_width = "32", test))]
     fn test_swar32_directly() {
         run_standard_suite(search_one_swar32);
     }

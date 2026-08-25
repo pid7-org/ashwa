@@ -18,8 +18,11 @@ use core::ptr;
 #[cfg(target_arch = "x86_64")]
 use crate::{get_cpu_feature, ISA};
 
-#[cfg(target_pointer_width = "64")]
+#[cfg(any(target_pointer_width = "64", test))]
 use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
+
+#[cfg(any(target_pointer_width = "32", test))]
+use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
 
 /// Searches for the first occurrence of a two-byte needle in a byte slice (`haystack`)
 ///
@@ -70,12 +73,30 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
 /// ```
 #[cfg(target_pointer_width = "32")]
 pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
-    haystack.windows(0x02).position(|w| w == needle)
+    #[cfg(target_arch = "wasm32")]
+    {
+        search_two_swar32(haystack, needle)
+    }
+
+    #[cfg(target_arch = "arm")]
+    {
+        search_two_swar32(haystack, needle)
+    }
+
+    #[cfg(target_arch = "x86")]
+    {
+        search_two_swar32(haystack, needle)
+    }
+
+    #[cfg(not(any(target_arch = "wasm32", target_arch = "arm", target_arch = "x86")))]
+    {
+        search_two_swar32(haystack, needle)
+    }
 }
 
 /// 64-bit SWAR implementation of two-byte needle search
 #[inline(always)]
-#[cfg(target_pointer_width = "64")]
+#[cfg(any(target_pointer_width = "64", test))]
 pub fn search_two_swar64(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
     let needle_a = (needle[0x00] as u64).wrapping_mul(LSB64);
     let needle_b = (needle[0x01] as u64).wrapping_mul(LSB64);
@@ -128,6 +149,67 @@ pub fn search_two_swar64(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
         }
 
         i += 0x08;
+    }
+
+    // Fallback for the remaining tail chunk
+    haystack[i..].windows(0x02).position(|w| w == needle).map(|pos| pos + i)
+}
+
+/// 32-bit SWAR implementation of two-byte needle search
+#[inline(always)]
+#[cfg(any(target_pointer_width = "32", test))]
+pub fn search_two_swar32(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
+    let needle_a = (needle[0x00] as u32).wrapping_mul(LSB32);
+    let needle_b = (needle[0x01] as u32).wrapping_mul(LSB32);
+
+    let mut i = 0x00;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    // Process 4 words (16 bytes) at a time. Requires 17 bytes to safely read offset by +1.
+    while i + 0x11 <= len {
+        let w1_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
+        let w1_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u32) };
+        let w2_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x04) as *const u32) };
+        let w2_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x05) as *const u32) };
+        let w3_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x08) as *const u32) };
+        let w3_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x09) as *const u32) };
+        let w4_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x0C) as *const u32) };
+        let w4_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x0D) as *const u32) };
+
+        let m1 = match_dword(w1_a, needle_a) & match_dword(w1_b, needle_b);
+        let m2 = match_dword(w2_a, needle_a) & match_dword(w2_b, needle_b);
+        let m3 = match_dword(w3_a, needle_a) & match_dword(w3_b, needle_b);
+        let m4 = match_dword(w4_a, needle_a) & match_dword(w4_b, needle_b);
+
+        if (m1 | m2 | m3 | m4) != 0x00 {
+            if m1 != 0x00 {
+                return Some(i + get_match_index_32(m1));
+            }
+            if m2 != 0x00 {
+                return Some(i + 0x04 + get_match_index_32(m2));
+            }
+            if m3 != 0x00 {
+                return Some(i + 0x08 + get_match_index_32(m3));
+            }
+            return Some(i + 0x0C + get_match_index_32(m4));
+        }
+
+        i += 0x10;
+    }
+
+    // Process 1 word (4 bytes) at a time. Requires 5 bytes to safely read offset by +1.
+    while i + 0x05 <= len {
+        let w_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
+        let w_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u32) };
+
+        let m = match_dword(w_a, needle_a) & match_dword(w_b, needle_b);
+
+        if m != 0x00 {
+            return Some(i + get_match_index_32(m));
+        }
+
+        i += 0x04;
     }
 
     // Fallback for the remaining tail chunk
@@ -227,9 +309,10 @@ mod tests {
         h34[0x21] = b'H';
         assert_eq!(search_fn(&h34, *b"GH"), Some(0x20));
 
-        // Cross-word boundary positions (straddling 8-byte and 32-byte chunks)
+        // Cross-word boundary positions (straddling 4-byte, 8-byte, and 32-byte chunks)
         let cross_positions = [
-            0x07, 0x08, 0x0F, 0x10, 0x17, 0x18, 0x1F, 0x20, 0x27, 0x28, 0x3F, 0x40,
+            0x03, 0x04, 0x07, 0x08, 0x0B, 0x0C, 0x0F, 0x10, 0x13, 0x14, 0x17, 0x18, 0x1B, 0x1C,
+            0x1F, 0x20, 0x27, 0x28, 0x3F, 0x40,
         ];
         let mut cross_buf = vec![b'-'; 0x80];
         for &pos in &cross_positions {
@@ -324,8 +407,9 @@ mod tests {
 
         // Tail chunk lengths
         let tail_lengths = [
-            0x02, 0x03, 0x05, 0x08, 0x09, 0x0A, 0x0F, 0x10, 0x11, 0x1F, 0x20, 0x21, 0x22, 0x2F,
-            0x30, 0x31, 0x3F, 0x40, 0x41, 0x7F, 0x80, 0x81, 0xFF, 0x100, 0x101,
+            0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0E, 0x0F, 0x10, 0x11, 0x12,
+            0x1F, 0x20, 0x21, 0x22, 0x2F, 0x30, 0x31, 0x3F, 0x40, 0x41, 0x7F, 0x80, 0x81, 0xFF,
+            0x100, 0x101,
         ];
         for &len in &tail_lengths {
             let mut h = vec![b'-'; len];
@@ -364,8 +448,14 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_pointer_width = "64")]
+    #[cfg(any(target_pointer_width = "64", test))]
     fn test_swar64_directly() {
         run_standard_suite(search_two_swar64);
+    }
+
+    #[test]
+    #[cfg(any(target_pointer_width = "32", test))]
+    fn test_swar32_directly() {
+        run_standard_suite(search_two_swar32);
     }
 }
