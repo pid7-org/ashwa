@@ -30,8 +30,10 @@ use core::{arch::x86_64, sync::atomic};
 
 mod common;
 mod one;
+mod two;
 
 pub use one::search_one;
+pub use two::search_two;
 
 #[repr(u8)]
 #[cfg(target_arch = "x86_64")]
