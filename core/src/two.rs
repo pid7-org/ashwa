@@ -18,6 +18,12 @@ use core::ptr;
 #[cfg(target_arch = "x86_64")]
 use crate::{get_cpu_feature, ISA};
 
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::*;
+
+#[cfg(target_arch = "x86")]
+use core::arch::x86::*;
+
 #[cfg(any(target_pointer_width = "64", test))]
 use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
 
@@ -42,7 +48,10 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
     match get_cpu_feature() {
         ISA::SWAR => search_two_swar64(haystack, needle),
-        _ => search_two_swar64(haystack, needle),
+        ISA::SSE2 | ISA::SSSE3 | ISA::SSE4_2 | ISA::AVX2 | ISA::AVX512BW => unsafe {
+            search_two_sse2(haystack, needle)
+        },
+        _ => unreachable!(),
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -85,6 +94,9 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
 
     #[cfg(target_arch = "x86")]
     {
+        #[cfg(target_feature = "sse2")]
+        return unsafe { search_two_sse2(haystack, needle) };
+
         search_two_swar32(haystack, needle)
     }
 
@@ -210,6 +222,94 @@ pub fn search_two_swar32(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
         }
 
         i += 0x04;
+    }
+
+    // Fallback for the remaining tail chunk
+    haystack[i..].windows(0x02).position(|w| w == needle).map(|pos| pos + i)
+}
+
+/// SSE2 implementation of two-byte needle search
+#[target_feature(enable = "sse2")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+pub unsafe fn search_two_sse2(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
+    let v_needle_a = _mm_set1_epi8(needle[0x00] as i8);
+    let v_needle_b = _mm_set1_epi8(needle[0x01] as i8);
+
+    let mut i = 0x00;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    // Process 4 vectors (64 bytes) at a time. Requires 65 bytes to safely read offset by +1.
+    while i + 0x41 <= len {
+        let v1_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v1_b = _mm_loadu_si128(ptr.add(i + 0x01) as *const __m128i);
+        let v2_a = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v2_b = _mm_loadu_si128(ptr.add(i + 0x11) as *const __m128i);
+        let v3_a = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v3_b = _mm_loadu_si128(ptr.add(i + 0x21) as *const __m128i);
+        let v4_a = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+        let v4_b = _mm_loadu_si128(ptr.add(i + 0x31) as *const __m128i);
+
+        let eq1 = _mm_and_si128(
+            _mm_cmpeq_epi8(v1_a, v_needle_a),
+            _mm_cmpeq_epi8(v1_b, v_needle_b),
+        );
+        let eq2 = _mm_and_si128(
+            _mm_cmpeq_epi8(v2_a, v_needle_a),
+            _mm_cmpeq_epi8(v2_b, v_needle_b),
+        );
+        let eq3 = _mm_and_si128(
+            _mm_cmpeq_epi8(v3_a, v_needle_a),
+            _mm_cmpeq_epi8(v3_b, v_needle_b),
+        );
+        let eq4 = _mm_and_si128(
+            _mm_cmpeq_epi8(v4_a, v_needle_a),
+            _mm_cmpeq_epi8(v4_b, v_needle_b),
+        );
+
+        let or1 = _mm_or_si128(eq1, eq2);
+        let or2 = _mm_or_si128(eq3, eq4);
+        let or_vec = _mm_or_si128(or1, or2);
+
+        if _mm_movemask_epi8(or_vec) != 0x00 {
+            let m1 = _mm_movemask_epi8(eq1);
+            if m1 != 0x00 {
+                return Some(i + m1.trailing_zeros() as usize);
+            }
+
+            let m2 = _mm_movemask_epi8(eq2);
+            if m2 != 0x00 {
+                return Some(i + 0x10 + m2.trailing_zeros() as usize);
+            }
+
+            let m3 = _mm_movemask_epi8(eq3);
+            if m3 != 0x00 {
+                return Some(i + 0x20 + m3.trailing_zeros() as usize);
+            }
+
+            let m4 = _mm_movemask_epi8(eq4);
+            return Some(i + 0x30 + m4.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
+    }
+
+    // Process 1 vector (16 bytes) at a time. Requires 17 bytes to safely read offset by +1.
+    while i + 0x11 <= len {
+        let v_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v_b = _mm_loadu_si128(ptr.add(i + 0x01) as *const __m128i);
+
+        let eq = _mm_and_si128(
+            _mm_cmpeq_epi8(v_a, v_needle_a),
+            _mm_cmpeq_epi8(v_b, v_needle_b),
+        );
+        let m = _mm_movemask_epi8(eq);
+
+        if m != 0x00 {
+            return Some(i + m.trailing_zeros() as usize);
+        }
+
+        i += 0x10;
     }
 
     // Fallback for the remaining tail chunk
@@ -457,5 +557,13 @@ mod tests {
     #[cfg(any(target_pointer_width = "32", test))]
     fn test_swar32_directly() {
         run_standard_suite(search_two_swar32);
+    }
+
+    #[test]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    fn test_sse2_directly() {
+        if std::is_x86_feature_detected!("sse2") {
+            run_standard_suite(|h, n| unsafe { search_two_sse2(h, n) });
+        }
     }
 }
