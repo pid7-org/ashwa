@@ -50,9 +50,8 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
         ISA::SWAR => search_two_swar64(haystack, needle),
         ISA::SSE2 => unsafe { search_two_sse2(haystack, needle) },
         ISA::SSSE3 => unsafe { search_two_ssse3(haystack, needle) },
-        ISA::SSE4_2 | ISA::AVX2 | ISA::AVX512BW => unsafe {
-            search_two_sse42(haystack, needle)
-        },
+        ISA::SSE4_2 => unsafe { search_two_sse42(haystack, needle) },
+        ISA::AVX2 | ISA::AVX512BW => unsafe { search_two_avx2(haystack, needle) },
         _ => unreachable!(),
     }
 
@@ -504,6 +503,69 @@ pub unsafe fn search_two_sse42(haystack: &[u8], needle: [u8; 0x02]) -> Option<us
     haystack[i..].windows(0x02).position(|w| w == needle).map(|pos| pos + i)
 }
 
+/// AVX2 implementation of two-byte needle search
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+pub unsafe fn search_two_avx2(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
+    let v_needle_a = _mm256_set1_epi8(needle[0x00] as i8);
+    let v_needle_b = _mm256_set1_epi8(needle[0x01] as i8);
+
+    let mut i = 0x00;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    // Process 2 vectors (64 bytes) at a time. Requires 65 bytes to safely read offset by +1.
+    while i + 0x41 <= len {
+        let v1_a = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v1_b = _mm256_loadu_si256(ptr.add(i + 0x01) as *const __m256i);
+        let v2_a = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+        let v2_b = _mm256_loadu_si256(ptr.add(i + 0x21) as *const __m256i);
+
+        let eq1 = _mm256_and_si256(
+            _mm256_cmpeq_epi8(v1_a, v_needle_a),
+            _mm256_cmpeq_epi8(v1_b, v_needle_b),
+        );
+        let eq2 = _mm256_and_si256(
+            _mm256_cmpeq_epi8(v2_a, v_needle_a),
+            _mm256_cmpeq_epi8(v2_b, v_needle_b),
+        );
+
+        let or_vec = _mm256_or_si256(eq1, eq2);
+        if _mm256_movemask_epi8(or_vec) != 0x00 {
+            let m1 = _mm256_movemask_epi8(eq1);
+            if m1 != 0x00 {
+                return Some(i + m1.trailing_zeros() as usize);
+            }
+
+            let m2 = _mm256_movemask_epi8(eq2);
+            return Some(i + 0x20 + m2.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
+    }
+
+    // Process 1 vector (32 bytes) at a time. Requires 33 bytes to safely read offset by +1.
+    if i + 0x21 <= len {
+        let v_a = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v_b = _mm256_loadu_si256(ptr.add(i + 0x01) as *const __m256i);
+
+        let eq = _mm256_and_si256(
+            _mm256_cmpeq_epi8(v_a, v_needle_a),
+            _mm256_cmpeq_epi8(v_b, v_needle_b),
+        );
+
+        let m = _mm256_movemask_epi8(eq);
+        if m != 0x00 {
+            return Some(i + m.trailing_zeros() as usize);
+        }
+
+        i += 0x20;
+    }
+
+    // Fallback for the remaining tail chunk
+    haystack[i..].windows(0x02).position(|w| w == needle).map(|pos| pos + i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -768,6 +830,14 @@ mod tests {
     fn test_sse42_directly() {
         if std::is_x86_feature_detected!("sse4.2") {
             run_standard_suite(|h, n| unsafe { search_two_sse42(h, n) });
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx2_directly() {
+        if std::is_x86_feature_detected!("avx2") {
+            run_standard_suite(|h, n| unsafe { search_two_avx2(h, n) });
         }
     }
 }
