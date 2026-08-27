@@ -66,7 +66,7 @@ use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
 #[cfg(any(target_pointer_width = "32", test))]
 use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
 
-/// Searches for the first occurrence of a single byte (`needle`) in a byte slice (`haystack`)
+/// Searches for the first occurrence of a single byte needle in a byte slice haystack
 ///
 /// ## Example
 ///
@@ -105,7 +105,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     }
 }
 
-/// Searches for the first occurrence of a single byte (`needle`) in a byte slice (`haystack`)
+/// Searches for the first occurrence of a single byte needle in a byte slice haystack
 ///
 /// ## Example
 ///

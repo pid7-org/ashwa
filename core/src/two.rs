@@ -6,7 +6,7 @@
 //! use ashwa::search_two;
 //!
 //! let text = b"The quick brown fox jumps over the lazy dog";
-//! assert_eq!(search_two(text, *b"qu"), Some(4));
+//! assert_eq!(search_two(text, *b"qu"), Some(0x04));
 //! assert_eq!(search_two(text, *b"ox"), Some(0x11));
 //! assert_eq!(search_two(text, *b"!!"), None);
 //! ```
@@ -36,7 +36,7 @@ use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
 #[cfg(any(target_pointer_width = "32", test))]
 use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
 
-/// Searches for the first occurrence of a two-byte needle in a byte slice haystack
+/// Searches for the first occurrence of a two-byte needle needle in a byte slice haystack
 ///
 /// ## Example
 ///
@@ -44,8 +44,8 @@ use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
 /// use ashwa::search_two;
 ///
 /// let haystack = b"hello world";
-/// assert_eq!(search_two(haystack, *b"el"), Some(1));
-/// assert_eq!(search_two(haystack, *b"ld"), Some(9));
+/// assert_eq!(search_two(haystack, *b"el"), Some(0x01));
+/// assert_eq!(search_two(haystack, *b"ld"), Some(0x09));
 /// assert_eq!(search_two(haystack, *b"zz"), None);
 /// ```
 #[inline(always)]
@@ -82,7 +82,7 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
     }
 }
 
-/// Searches for the first occurrence of a two-byte needle in a byte slice haystack
+/// Searches for the first occurrence of a two-byte needle needle in a byte slice haystack
 ///
 /// ## Example
 ///
@@ -90,8 +90,8 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
 /// use ashwa::search_two;
 ///
 /// let haystack = b"hello world";
-/// assert_eq!(search_two(haystack, *b"el"), Some(1));
-/// assert_eq!(search_two(haystack, *b"ld"), Some(9));
+/// assert_eq!(search_two(haystack, *b"el"), Some(0x01));
+/// assert_eq!(search_two(haystack, *b"ld"), Some(0x09));
 /// assert_eq!(search_two(haystack, *b"zz"), None);
 /// ```
 #[cfg(target_pointer_width = "32")]
@@ -198,10 +198,10 @@ fn search_two_swar32(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
     let needle_a = (needle[0x00] as u32).wrapping_mul(LSB32);
     let needle_b = (needle[0x01] as u32).wrapping_mul(LSB32);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x11 <= len {
         let w1_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
         let w1_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u32) };
@@ -241,7 +241,6 @@ fn search_two_swar32(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
         let w_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u32) };
 
         let m = match_dword(w_a, needle_a) & match_dword(w_b, needle_b);
-
         if m != 0x00 {
             return Some(i + get_match_index_32(m));
         }
@@ -258,10 +257,10 @@ unsafe fn search_two_sse2(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> 
     let v_needle_a = _mm_set1_epi8(needle[0x00] as i8);
     let v_needle_b = _mm_set1_epi8(needle[0x01] as i8);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x41 <= len {
         let v1_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
         let v1_b = _mm_loadu_si128(ptr.add(i + 0x01) as *const __m128i);
@@ -327,10 +326,10 @@ unsafe fn search_two_ssse3(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize>
     let v_needle_a = _mm_set1_epi8(needle[0x00] as i8);
     let v_needle_b = _mm_set1_epi8(needle[0x01] as i8);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x50 <= len {
         let v1 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
         let v2 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
@@ -451,7 +450,6 @@ unsafe fn search_two_sse42(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize>
         let v_b = _mm_loadu_si128(ptr.add(i + 0x01) as *const __m128i);
 
         let eq = _mm_and_si128(_mm_cmpeq_epi8(v_a, v_needle_a), _mm_cmpeq_epi8(v_b, v_needle_b));
-
         if _mm_testz_si128(eq, eq) == 0x00 {
             let m = _mm_movemask_epi8(eq);
             return Some(i + m.trailing_zeros() as usize);
@@ -469,10 +467,10 @@ unsafe fn search_two_avx2(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> 
     let v_needle_a = _mm256_set1_epi8(needle[0x00] as i8);
     let v_needle_b = _mm256_set1_epi8(needle[0x01] as i8);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x41 <= len {
         let v1_a = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
         let v1_b = _mm256_loadu_si256(ptr.add(i + 0x01) as *const __m256i);
@@ -528,10 +526,10 @@ unsafe fn search_two_avx512(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize
     let v_needle_a = _mm512_set1_epi8(needle[0x00] as i8);
     let v_needle_b = _mm512_set1_epi8(needle[0x01] as i8);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x81 <= len {
         let v1_a = _mm512_loadu_si512(ptr.add(i) as *const _);
         let v1_b = _mm512_loadu_si512(ptr.add(i + 0x01) as *const _);
@@ -581,10 +579,10 @@ unsafe fn search_two_neon(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> 
     let v_needle_a = vdupq_n_u8(needle[0x00]);
     let v_needle_b = vdupq_n_u8(needle[0x01]);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x50 <= len {
         let v1 = vld1q_u8(ptr.add(i));
         let v2 = vld1q_u8(ptr.add(i + 0x10));
@@ -666,10 +664,10 @@ unsafe fn search_two_neon(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> 
     let v_needle_a = vdupq_n_u8(needle[0x00]);
     let v_needle_b = vdupq_n_u8(needle[0x01]);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x50 <= len {
         let v1 = vld1q_u8(ptr.add(i));
         let v2 = vld1q_u8(ptr.add(i + 0x10));
@@ -715,7 +713,6 @@ unsafe fn search_two_neon(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> 
         let v_b = vld1q_u8(ptr.add(i + 0x01));
 
         let eq = vandq_u8(vceqq_u8(v_a, v_needle_a), vceqq_u8(v_b, v_needle_b));
-
         if any_match(eq) {
             return Some(i + get_match_index_neon_arm32(eq));
         }
@@ -746,10 +743,10 @@ unsafe fn search_two_simd128(haystack: &[u8], needle: [u8; 0x02]) -> Option<usiz
     let v_needle_a = u8x16_splat(needle[0x00]);
     let v_needle_b = u8x16_splat(needle[0x01]);
 
-    let mut i = 0x00;
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
+    let mut i = 0x00;
     while i + 0x50 <= len {
         let v1 = v128_load(ptr.add(i) as *const v128);
         let v2 = v128_load(ptr.add(i + 0x10) as *const v128);
@@ -981,7 +978,6 @@ mod tests {
                 "Failed straddling cross-word position {}",
                 pos
             );
-
             cross_buf[pos] = b'-';
             cross_buf[pos + 0x01] = b'-';
         }
@@ -1022,7 +1018,6 @@ mod tests {
         let mut haystack_high = vec![0x80; 0x40];
         haystack_high[0x3E] = 0xFE;
         haystack_high[0x3F] = 0xFF;
-
         assert_eq!(search_fn(&haystack_high, [0x7F, 0x80]), None);
         assert_eq!(search_fn(&haystack_high, [0xFE, 0xFF]), Some(0x3E));
 
