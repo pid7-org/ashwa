@@ -24,6 +24,9 @@ use core::arch::x86_64::*;
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 
+#[cfg(target_arch = "wasm32")]
+use core::arch::wasm32::*;
+
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
@@ -95,6 +98,9 @@ pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
 pub fn search_two(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
     #[cfg(target_arch = "wasm32")]
     {
+        #[cfg(target_feature = "simd128")]
+        return unsafe { search_two_simd128(haystack, needle) };
+
         search_two_swar32(haystack, needle)
     }
 
@@ -734,6 +740,145 @@ unsafe fn get_match_index_neon_arm32(eq: uint8x16_t) -> usize {
     0x08 + (lane1.trailing_zeros() / 0x08) as usize
 }
 
+#[target_feature(enable = "simd128")]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+unsafe fn search_two_simd128(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
+    let v_needle_a = u8x16_splat(needle[0x00]);
+    let v_needle_b = u8x16_splat(needle[0x01]);
+
+    let mut i = 0x00;
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    while i + 0x50 <= len {
+        let v1 = v128_load(ptr.add(i) as *const v128);
+        let v2 = v128_load(ptr.add(i + 0x10) as *const v128);
+        let v3 = v128_load(ptr.add(i + 0x20) as *const v128);
+        let v4 = v128_load(ptr.add(i + 0x30) as *const v128);
+        let v5 = v128_load(ptr.add(i + 0x40) as *const v128);
+
+        let v1_b = i8x16_shuffle::<
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08,
+            0x09,
+            0x0A,
+            0x0B,
+            0x0C,
+            0x0D,
+            0x0E,
+            0x0F,
+            0x10,
+        >(v1, v2);
+        let v2_b = i8x16_shuffle::<
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08,
+            0x09,
+            0x0A,
+            0x0B,
+            0x0C,
+            0x0D,
+            0x0E,
+            0x0F,
+            0x10,
+        >(v2, v3);
+        let v3_b = i8x16_shuffle::<
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08,
+            0x09,
+            0x0A,
+            0x0B,
+            0x0C,
+            0x0D,
+            0x0E,
+            0x0F,
+            0x10,
+        >(v3, v4);
+        let v4_b = i8x16_shuffle::<
+            0x01,
+            0x02,
+            0x03,
+            0x04,
+            0x05,
+            0x06,
+            0x07,
+            0x08,
+            0x09,
+            0x0A,
+            0x0B,
+            0x0C,
+            0x0D,
+            0x0E,
+            0x0F,
+            0x10,
+        >(v4, v5);
+
+        let eq1 = v128_and(u8x16_eq(v1, v_needle_a), u8x16_eq(v1_b, v_needle_b));
+        let eq2 = v128_and(u8x16_eq(v2, v_needle_a), u8x16_eq(v2_b, v_needle_b));
+        let eq3 = v128_and(u8x16_eq(v3, v_needle_a), u8x16_eq(v3_b, v_needle_b));
+        let eq4 = v128_and(u8x16_eq(v4, v_needle_a), u8x16_eq(v4_b, v_needle_b));
+
+        let or1 = v128_or(eq1, eq2);
+        let or2 = v128_or(eq3, eq4);
+        let or_vec = v128_or(or1, or2);
+
+        if u8x16_bitmask(or_vec) != 0x00 {
+            let m1 = u8x16_bitmask(eq1);
+            if m1 != 0x00 {
+                return Some(i + m1.trailing_zeros() as usize);
+            }
+
+            let m2 = u8x16_bitmask(eq2);
+            if m2 != 0x00 {
+                return Some(i + 0x10 + m2.trailing_zeros() as usize);
+            }
+
+            let m3 = u8x16_bitmask(eq3);
+            if m3 != 0x00 {
+                return Some(i + 0x20 + m3.trailing_zeros() as usize);
+            }
+
+            let m4 = u8x16_bitmask(eq4);
+            return Some(i + 0x30 + m4.trailing_zeros() as usize);
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x11 <= len {
+        let v_a = v128_load(ptr.add(i) as *const v128);
+        let v_b = v128_load(ptr.add(i + 0x01) as *const v128);
+
+        let eq = v128_and(u8x16_eq(v_a, v_needle_a), u8x16_eq(v_b, v_needle_b));
+        let mask = u8x16_bitmask(eq);
+
+        if mask != 0x00 {
+            return Some(i + mask.trailing_zeros() as usize);
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(0x02).position(|w| w == needle).map(|pos| pos + i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1005,5 +1150,11 @@ mod tests {
     #[cfg(all(target_arch = "arm", target_feature = "neon"))]
     fn test_neon_arm32_directly() {
         run_standard_suite(|h, n| unsafe { search_two_neon(h, n) });
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    fn test_simd128_directly() {
+        run_standard_suite(|h, n| unsafe { search_two_simd128(h, n) });
     }
 }
