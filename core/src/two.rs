@@ -651,8 +651,6 @@ unsafe fn get_match_index_neon(eq: uint8x16_t) -> usize {
 #[target_feature(enable = "neon")]
 #[cfg(all(target_arch = "arm", target_feature = "neon", target_pointer_width = "32"))]
 unsafe fn search_two_neon(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> {
-    use core::arch::arm::*;
-
     #[inline(always)]
     unsafe fn any_match(v: uint8x16_t) -> bool {
         let lanes = vreinterpretq_u64_u8(v);
@@ -724,8 +722,7 @@ unsafe fn search_two_neon(haystack: &[u8], needle: [u8; 0x02]) -> Option<usize> 
 
 #[inline(always)]
 #[cfg(all(target_arch = "arm", target_feature = "neon"))]
-unsafe fn get_match_index_neon_arm32(eq: core::arch::arm::uint8x16_t) -> usize {
-    use core::arch::arm::*;
+unsafe fn get_match_index_neon_arm32(eq: uint8x16_t) -> usize {
     let eq_u64 = vreinterpretq_u64_u8(eq);
 
     let lane0 = vgetq_lane_u64(eq_u64, 0x00);
