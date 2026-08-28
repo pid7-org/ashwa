@@ -96,33 +96,43 @@ jobs:
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             arch: x64
+            toolchain: nightly
+            rustflags: "-C target-feature=+avx512bw"
 
           - name: "linux-aarch64"
             os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             arch: arm64
+            toolchain: stable
+            rustflags: ""
 
           - name: "macos-aarch64"
             os: macos-latest
             target: aarch64-apple-darwin
             arch: arm64
+            toolchain: stable
+            rustflags: ""
 
           - name: "windows-x86_64"
             os: windows-latest
             target: x86_64-pc-windows-msvc
             arch: x64
+            toolchain: nightly
+            rustflags: "-C target-feature=+avx512bw"
 
           - name: "windows-aarch64"
             os: windows-11-arm
             target: aarch64-pc-windows-msvc
             arch: arm64
+            toolchain: stable
+            rustflags: ""
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.toolchain }}
           target: ${{ matrix.target }}
 
       - uses: actions/setup-node@v7
@@ -134,9 +144,11 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: rust-${{ runner.os }}-${{ matrix.target }}-release-native
+          key: rust-${{ runner.os }}-${{ matrix.target }}-${{ matrix.toolchain }}-release-native
 
       - name: Build native addon
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
         run: |
           cd npm
           npm ci || npm install
@@ -151,8 +163,11 @@ jobs:
 
       - name: Build PyPI wheel
         uses: PyO3/maturin-action@v1
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
         with:
           target: ${{ matrix.target }}
+          rust-toolchain: ${{ matrix.toolchain }}
           args: --release --locked --find-interpreter --out dist -m pypi/Cargo.toml
           sccache: 'true'
 
