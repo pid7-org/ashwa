@@ -25,6 +25,23 @@ Hardware accelerated routines for single substring search
 | ARMv7           | Linux ARM, Android                           | 128-bit ARM NEON                     | 32-bit SWAR |
 | WebAssembly     | Browsers, Node.js (wasm32)                   | WASM SIMD128 (simd128)               | 32-bit SWAR |
 
+## `AVX512` Support
+
+> [!IMPORTANT]
+> The `AVX512BW` ISA backend requires the **nightly** toolchain and an explicit target feature flags passed
+> at compile-time.
+>
+> On stable toolchains or when flags are omitted, `ashwa` gracefully falls back to AVX2 / SSE4.2 / SWAR routines
+> with zero overhead.
+>
+> ```bash
+> # Build with explicit AVX512BW feature flags
+> RUSTFLAGS="-C target-feature=+avx512bw" cargo +nightly build --release
+>
+> # Or enable native host CPU features (including AVX-512 on supported processors)
+> RUSTFLAGS="-C target-cpu=native" cargo +nightly build --release
+> ```
+
 ## Installation
 
 Add `ashwa` to your `Cargo.toml`:
@@ -43,13 +60,20 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for detailed documentati
 - [`search_one`](#search_one)
 - [`search_two`](#search_two)
 
-| Specs            | x86_64 (`x64`)                                        | AArch64 (`arm64`)                                 |
-|:-----------------|:------------------------------------------------------|:--------------------------------------------------|
-| SIMD Target      | `AVX-512BW`                                           | `ARM NEON`                                        |
-| CPU Model        | Intel(R) Xeon(R) Platinum 8375C @ 2.90GHz (8C/16T)    | AWS Graviton3 ARM Neoverse-V1 (16C/16T)           |
-| Cache Hierarchy  | L1d: 384 KiB · L1i: 256 KiB · L2: 10 MiB · L3: 54 MiB | L1d: 1 MiB · L1i: 1 MiB · L2: 16 MiB · L3: 32 MiB |
-| Memory Bandwidth | 20.32 GB/s                                            | 76.50 GB/s                                        |
-| Toolchain        | `+nightly`                                            | stable                                            |
+> [!NOTE]
+> Benchmarks are evaluated across dedicated AWS EC2 hardware environments,
+>
+> * x86_64 (_x64_)
+>   * Instance: Intel(R) Xeon(R) Platinum 8375C @ 2.90GHz (8C/16T)
+>   * ISA: _AVX-512BW_ (`+nightly`)
+>   * Cache: L1d: 384 KiB · L2: 10 MiB · L3: 54 MiB
+>   * STREAM Triad: 20.32 GiB/s
+>
+> * AArch64 (_arm64_)
+>   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
+>   * ISA: _NEON_ (stable)
+>   * Cache: L1d: 1 MiB · L2: 16 MiB · L3: 32 MiB
+>   * STREAM Triad: 76.50 GiB/s
 
 ### `search_one`
 
