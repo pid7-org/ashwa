@@ -31,7 +31,7 @@ describe("Headless Browser WASM SIMD128 Execution", () => {
 
     const jsCode = fs.readFileSync(
       path.join(__dirname, "../wasm/pkg/ashwa_wasm.js"),
-      "utf8"
+      "utf8",
     );
 
     // NOTE: Injecting WASM module into real Browser V8 engine context
@@ -51,21 +51,30 @@ describe("Headless Browser WASM SIMD128 Execution", () => {
         await mod.default({ module_or_path: bytes.buffer });
 
         const haystack = new TextEncoder().encode(
-          "Hello, World! SIMD128 Headless Chrome Test."
+          "Hello, World! SIMD128 Headless Chrome Test.",
         );
         const matchW = mod.searchOne(haystack, "W".charCodeAt(0));
         const matchZ = mod.searchOne(haystack, "Z".charCodeAt(0));
 
+        const needleWo = new TextEncoder().encode("Wo");
+        const needleZZ = new TextEncoder().encode("ZZ");
+        const matchWo = mod.searchTwo(haystack, needleWo);
+        const matchZZ = mod.searchTwo(haystack, needleZZ);
+
         return {
           matchW: Number(matchW),
           matchZ: matchZ != null ? Number(matchZ) : null,
+          matchWo: matchWo != null ? Number(matchWo) : null,
+          matchZZ: matchZZ != null ? Number(matchZZ) : null,
         };
       },
-      { code: jsCode, base64: wasmBase64 }
+      { code: jsCode, base64: wasmBase64 },
     );
 
     assert.strictEqual(result.matchW, 7);
     assert.strictEqual(result.matchZ, null);
+    assert.strictEqual(result.matchWo, 7);
+    assert.strictEqual(result.matchZZ, null);
   });
 
   test("Teardown Headless Chromium", async () => {
