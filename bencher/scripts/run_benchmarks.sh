@@ -8,6 +8,58 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CPU_CORE="${CPU_CORE:-2}"
+BENCH_TARGET="${BENCH_TARGET:-}"
+
+normalize_target() {
+    case "${1,,}" in
+        1|one|one_throughput|search_one) echo "one" ;;
+        2|two|two_throughput|search_two) echo "two" ;;
+        *) echo "" ;;
+    esac
+}
+
+if [ $# -gt 0 ] && [ -z "$BENCH_TARGET" ]; then
+    BENCH_TARGET="$1"
+fi
+
+if [ -n "$BENCH_TARGET" ]; then
+    BENCH_TARGET=$(normalize_target "$BENCH_TARGET")
+fi
+
+if [ -z "$BENCH_TARGET" ]; then
+    if [ -t 0 ]; then
+        echo "================================================================================"
+        echo "                       ASHWA BENCHMARK SUITE SELECTION                          "
+        echo "================================================================================"
+        echo " Please select the benchmark suite to run (no default):"
+        echo "   1) one - Single-byte search benchmark (search_one / one_throughput)"
+        echo "   2) two - Two-byte search benchmark (search_two / two_throughput)"
+        read -rp " Select benchmark suite [1/2 or one/two]: " user_choice
+        BENCH_TARGET=$(normalize_target "$user_choice")
+    fi
+fi
+
+if [ -z "$BENCH_TARGET" ]; then
+    echo "Error: BENCH_TARGET is required (no default). Must be 'one' or 'two'."
+    exit 1
+fi
+
+if [ "$BENCH_TARGET" = "one" ]; then
+    SUITE_TITLE="search_one (Single-Byte Needle)"
+    CORE_BENCH="one_throughput"
+    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/one_throughput.js"
+    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_throughput.js"
+    PYPI_BENCH="$HOME/ashwa/pypi/benches/one_throughput.py"
+    ILP_EXAMPLE="one_ilp"
+else
+    SUITE_TITLE="search_two (Two-Byte Needle)"
+    CORE_BENCH="two_throughput"
+    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/two_throughput.js"
+    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_two_throughput.js"
+    PYPI_BENCH="$HOME/ashwa/pypi/benches/two_throughput.py"
+    ILP_EXAMPLE="two_ilp"
+fi
+
 RESULTS_DIR="${HOME}/results"
 
 mkdir -p "$RESULTS_DIR"
@@ -170,6 +222,7 @@ echo "--------------------------------------------------------------------------
 echo "Date:         $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 echo "Host:         $HOST_NAME"
 echo "Commit:       $GIT_COMMIT"
+echo "Target Suite: $SUITE_TITLE"
 echo "CPU Model:    $CPU_MODEL"
 echo "CPU Cores:    $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
 echo "Toolchain:    $CARGO_CMD | Node.js: $NODE_VERSION | Python: $PYTHON_VERSION"
@@ -186,7 +239,7 @@ echo ""
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
+echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
@@ -198,8 +251,8 @@ drop_caches() {
 }
 
 drop_caches
-$CARGO_CMD bench -q --no-run -p ashwa --bench one_throughput >/dev/null 2>&1 || true
-taskset -c "$CPU_CORE" $CARGO_CMD bench -q -p ashwa --bench one_throughput -- --nocapture 2>&1 | grep -v -E '^(Finished|Running|\s*$)' | tee "${RESULTS_DIR}/throughput_latency.log"
+$CARGO_CMD bench -q --no-run -p ashwa --bench "$CORE_BENCH" >/dev/null 2>&1 || true
+taskset -c "$CPU_CORE" $CARGO_CMD bench -q -p ashwa --bench "$CORE_BENCH" -- --nocapture 2>&1 | grep -v -E '^(Finished|Running|\s*$)' | tee "${RESULTS_DIR}/throughput_latency.log"
 echo "--------------------------------------------------------------------------------"
 echo ""
 
@@ -208,7 +261,7 @@ echo ""
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
 echo " Node.js:        $NODE_VERSION"
 echo " Architecture:   $ARCH_UNAME"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
@@ -236,14 +289,14 @@ if [ -d "$HOME/ashwa/npm" ]; then
 fi
 
 if command -v node >/dev/null 2>&1; then
-    if [ -f "$HOME/ashwa/npm/benches/one_throughput.js" ]; then
+    if [ -f "$NPM_NODE_BENCH" ]; then
         echo " >> Node.js / V8 Native N-API Throughput Benchmark:"
         drop_caches
-        taskset -c "$CPU_CORE" node "$HOME/ashwa/npm/benches/one_throughput.js" 2>&1 | tee "${RESULTS_DIR}/npm_node_throughput_latency.log"
+        taskset -c "$CPU_CORE" node "$NPM_NODE_BENCH" 2>&1 | tee "${RESULTS_DIR}/npm_node_throughput_latency.log"
         echo ""
     fi
 
-    if [ "$ARCH_UNAME" = "x86_64" ] && [ -f "$HOME/ashwa/npm/benches/wasm_throughput.js" ]; then
+    if [ "$ARCH_UNAME" = "x86_64" ] && [ -f "$NPM_WASM_BENCH" ]; then
         if [ ! -f "$HOME/ashwa/npm/wasm/pkg/ashwa_wasm.js" ] && command -v wasm-pack >/dev/null 2>&1; then
             (cd "$HOME/ashwa/npm" && npm run build:wasm >/dev/null 2>&1 || true)
         fi
@@ -251,7 +304,7 @@ if command -v node >/dev/null 2>&1; then
         if [ -f "$HOME/ashwa/npm/wasm/pkg/ashwa_wasm.js" ] && [ -f "$HOME/ashwa/npm/wasm/pkg/ashwa_wasm_bg.wasm" ]; then
             echo " >> WebAssembly SIMD128 Throughput Benchmark (x86_64 only):"
             drop_caches
-            taskset -c "$CPU_CORE" node "$HOME/ashwa/npm/benches/wasm_throughput.js" 2>&1 | tee "${RESULTS_DIR}/npm_wasm_throughput_latency.log"
+            taskset -c "$CPU_CORE" node "$NPM_WASM_BENCH" 2>&1 | tee "${RESULTS_DIR}/npm_wasm_throughput_latency.log"
             echo ""
         else
             echo " >> WebAssembly SIMD128 package not available. Skipping WASM benchmark."
@@ -269,7 +322,7 @@ echo ""
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
 echo " Python:         $PYTHON_VERSION"
 echo " Architecture:   $ARCH_UNAME"
 echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
@@ -294,10 +347,10 @@ if [ -d "$HOME/ashwa/pypi" ]; then
 fi
 
 if command -v python3 >/dev/null 2>&1; then
-    if [ -f "$HOME/ashwa/pypi/benches/one_throughput.py" ]; then
+    if [ -f "$PYPI_BENCH" ]; then
         echo " >> Python / PyO3 Native C-Extension Throughput Benchmark:"
         drop_caches
-        taskset -c "$CPU_CORE" python3 "$HOME/ashwa/pypi/benches/one_throughput.py" 2>&1 | tee "${RESULTS_DIR}/python_throughput_latency.log"
+        taskset -c "$CPU_CORE" python3 "$PYPI_BENCH" 2>&1 | tee "${RESULTS_DIR}/python_throughput_latency.log"
         echo ""
     fi
 else
@@ -311,16 +364,16 @@ echo ""
 # ==============================================================================
 
 echo "--------------------------------------------------------------------------------"
-echo " [5/5] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS"
-echo " Harness:        core/examples/one_ilp.rs"
+echo " [5/5] MEASURING INSTRUCTION-LEVEL PARALLELISM (ILP / IPC) & CPU METRICS ($SUITE_TITLE)"
+echo " Harness:        core/examples/${ILP_EXAMPLE}.rs"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "--------------------------------------------------------------------------------"
 
-$CARGO_CMD build -q --release -p ashwa --example one_ilp >/dev/null 2>&1
-ILP_BIN="./target/release/examples/one_ilp"
-[ ! -f "$ILP_BIN" ] && ILP_BIN="./target/release/one_ilp"
+$CARGO_CMD build -q --release -p ashwa --example "$ILP_EXAMPLE" >/dev/null 2>&1
+ILP_BIN="./target/release/examples/${ILP_EXAMPLE}"
+[ ! -f "$ILP_BIN" ] && ILP_BIN="./target/release/${ILP_EXAMPLE}"
 
 TIERS=("l1" "l2" "l3" "ram")
 TIER_LABELS=("L1 Cache (32 KiB)" "L2 Cache (512 KiB)" "L3 Cache (16 MiB)" "RAM (256 MiB)")
@@ -437,25 +490,26 @@ echo ""
     echo "--------------------------------------------------------------------------------"
     echo "                        ASHWA CONTEXTUAL BENCHMARK REPORT                       "
     echo "--------------------------------------------------------------------------------"
-    echo "Date:       $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-    echo "Host:       $HOST_NAME"
-    echo "Commit:     $GIT_COMMIT"
-    echo "CPU Model:  $CPU_MODEL"
-    echo "CPU Cores:  $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
-    echo "ISA Target: $HIGHEST_ISA"
-    echo "Toolchain:  $CARGO_CMD | Node.js: $NODE_VERSION | Python: $PYTHON_VERSION"
+    echo "Date:         $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+    echo "Host:         $HOST_NAME"
+    echo "Commit:       $GIT_COMMIT"
+    echo "Target Suite: $SUITE_TITLE"
+    echo "CPU Model:    $CPU_MODEL"
+    echo "CPU Cores:    $TOTAL_CORES physical cores, $TOTAL_THREADS threads ($THREADS_PER_CORE threads/core)"
+    echo "ISA Target:   $HIGHEST_ISA"
+    echo "Toolchain:    $CARGO_CMD | Node.js: $NODE_VERSION | Python: $PYTHON_VERSION"
     echo "--------------------------------------------------------------------------------"
     echo ""
     render_context_1
     echo ""
     echo "--------------------------------------------------------------------------------"
-    echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK"
+    echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
     echo "--------------------------------------------------------------------------------"
     cat "${RESULTS_DIR}/throughput_latency.log" 2>/dev/null || true
     echo "--------------------------------------------------------------------------------"
     echo ""
     echo "--------------------------------------------------------------------------------"
-    echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+    echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
     echo "--------------------------------------------------------------------------------"
     if [ -f "${RESULTS_DIR}/npm_node_throughput_latency.log" ]; then
         echo " >> Node.js / V8 Native N-API:"
@@ -470,7 +524,7 @@ echo ""
     echo "--------------------------------------------------------------------------------"
     echo ""
     echo "--------------------------------------------------------------------------------"
-    echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK"
+    echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
     echo "--------------------------------------------------------------------------------"
     if [ -f "${RESULTS_DIR}/python_throughput_latency.log" ]; then
         echo " >> Python / PyO3 Native C-Extension:"

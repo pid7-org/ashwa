@@ -13,6 +13,7 @@ RESULTS_DIR="${SCRIPT_DIR}/results"
 AWS_PROFILE_ARG=""
 REGION="us-east-1"
 TARGET_ARCH="x86_64"
+BENCH_TARGET=""
 USER_INSTANCE_TYPE=""
 USE_SPOT="true"
 CPU_CORE=2
@@ -43,6 +44,11 @@ collects artifacts, and automatically tears down cloud resources.
 Arguments:
   profile                   AWS CLI profile name (default: \$AWS_PROFILE or 'default')
 
+Benchmark Suite (REQUIRED - no default):
+  -t, --target, --suite <t> Target suite to benchmark: 'one' or 'two'
+      --one, -1             Benchmark single-byte search (search_one / one_throughput)
+      --two, -2             Benchmark two-byte search (search_two / two_throughput)
+
 Options:
   -a, --arch <arch>         Target architecture: 'x86_64', 'aarch64', or 'all'/'parallel' (default: x86_64)
       --aarch64, --arm64    Run benchmark on aarch64 (AWS Graviton3 with ARM NEON)
@@ -62,10 +68,30 @@ EOF
     exit 0
 }
 
+normalize_target() {
+    case "${1,,}" in
+        1|one|one_throughput|search_one) echo "one" ;;
+        2|two|two_throughput|search_two) echo "two" ;;
+        *) echo "" ;;
+    esac
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
             usage
+            ;;
+        -t|--target|--suite|--bench)
+            BENCH_TARGET="$2"
+            shift 2
+            ;;
+        --one|-1)
+            BENCH_TARGET="one"
+            shift
+            ;;
+        --two|-2)
+            BENCH_TARGET="two"
+            shift
             ;;
         -a|--arch|--architecture)
             TARGET_ARCH="$2"
@@ -122,6 +148,8 @@ while [[ $# -gt 0 ]]; do
                     aarch64|arm64) TARGET_ARCH="aarch64" ;;
                     all|both|parallel) TARGET_ARCH="all" ;;
                 esac
+            elif [[ "$1" =~ ^(1|one|two|2|one_throughput|two_throughput|search_one|search_two)$ ]]; then
+                BENCH_TARGET=$(normalize_target "$1")
             elif [ -z "$AWS_PROFILE_ARG" ]; then
                 AWS_PROFILE_ARG="$1"
             fi
@@ -129,6 +157,38 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [ -n "$BENCH_TARGET" ]; then
+    BENCH_TARGET=$(normalize_target "$BENCH_TARGET")
+    if [ -z "$BENCH_TARGET" ]; then
+        echo "Error: Invalid benchmark target. Choose 'one' or 'two'."
+        exit 1
+    fi
+fi
+
+if [ -z "$BENCH_TARGET" ]; then
+    if [ -t 0 ]; then
+        echo ""
+        echo "================================================================================"
+        echo "                       ASHWA BENCHMARK SUITE SELECTION                          "
+        echo "================================================================================"
+        echo " Please select the benchmark suite to run (no default):"
+        echo ""
+        echo "   1) one  - Single-byte search benchmark (search_one / one_throughput)"
+        echo "   2) two  - Two-byte search benchmark (search_two / two_throughput)"
+        echo ""
+        read -rp " Select benchmark suite [1/2 or one/two]: " user_choice
+        BENCH_TARGET=$(normalize_target "$user_choice")
+        if [ -z "$BENCH_TARGET" ]; then
+            echo "Error: Invalid selection '$user_choice'. Predefined options: 'one', 'two'."
+            exit 1
+        fi
+        echo ""
+    else
+        echo "Error: Benchmark target is required (no default). Specify --target <one|two>, --one, or --two."
+        exit 1
+    fi
+fi
 
 # Normalize and resolve git ref
 if [ "${GIT_REF,,}" = "head" ]; then
@@ -410,8 +470,8 @@ REMOTE_BOOTSTRAP
     scp -r $ssh_opts "${TERRAFORM_DIR}/scripts" "ubuntu@$public_ip:/home/ubuntu/" >/dev/null
     ssh $ssh_opts "ubuntu@$public_ip" "chmod +x /home/ubuntu/scripts/run_benchmarks.sh"
 
-    log "[4/5] Executing benchmark suite on remote runner (Core $CPU_CORE)..."
-    ssh $ssh_opts "ubuntu@$public_ip" "CPU_CORE=$CPU_CORE /home/ubuntu/scripts/run_benchmarks.sh"
+    log "[4/5] Executing benchmark suite ($BENCH_TARGET) on remote runner (Core $CPU_CORE)..."
+    ssh $ssh_opts "ubuntu@$public_ip" "BENCH_TARGET=$BENCH_TARGET CPU_CORE=$CPU_CORE /home/ubuntu/scripts/run_benchmarks.sh"
 
     log "[5/5] Fetching results and teardown..."
     mkdir -p "$arch_results_dir"
@@ -436,6 +496,7 @@ echo "                     ASHWA AWS BENCHMARK ORCHESTRATOR                     
 echo "--------------------------------------------------------------------------------"
 echo " Profile:       ${EFFECTIVE_PROFILE:-<environment credentials>}"
 echo " Region:        $REGION"
+echo " Target Suite:  $BENCH_TARGET ($([ "$BENCH_TARGET" = "one" ] && echo "Single-Byte search_one" || echo "Two-Byte search_two"))"
 echo " Target Arch:   ${EXEC_ARCHES[*]}"
 if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
     echo " Instance Type: $(get_instance_type_for_arch "${EXEC_ARCHES[0]}") (64 GiB RAM, 16 vCPUs)"

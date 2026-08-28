@@ -5,23 +5,26 @@ Automated ephemeral AWS EC2 benchmark orchestrator for `ashwa` across **x86_64**
 ## Usage
 
 ```bash
-# Run on default x86_64 (m6i.4xlarge - 64 GiB RAM, 16 vCPUs)
-./bench-aws
+# Run search_one on default x86_64 (m6i.4xlarge - 64 GiB RAM, 16 vCPUs)
+./bench-aws --target one
 
-# Run on aarch64 (m7g.4xlarge - 64 GiB RAM, 16 vCPUs, ARM NEON)
-./bench-aws --aarch64
+# Run search_two on aarch64 (m7g.4xlarge - 64 GiB RAM, 16 vCPUs, ARM NEON)
+./bench-aws --target two --aarch64
 
-# Run BOTH x86_64 and aarch64 concurrently in parallel
-./bench-aws --parallel
+# Run search_two on BOTH x86_64 and aarch64 concurrently in parallel
+./bench-aws --two --parallel
 
-# Run with custom profile, region, and branch
-./bench-aws default --arch aarch64 --region us-east-1 --branch master --core 2
+# Run with custom profile, region, branch, and core pinning
+./bench-aws default --target two --arch aarch64 --region us-east-1 --branch master --core 2
 ```
 
 ## Options
 
 | Option | Description | Default |
 |:-------|:------------|:--------|
+| `-t, --target, --suite <t>` | Benchmark suite: `one` (search_one) or `two` (search_two) | **Required (No default)** |
+| `--one, -1` | Benchmark single-byte search (`search_one` / `one_throughput`) | - |
+| `--two, -2` | Benchmark two-byte search (`search_two` / `two_throughput`) | - |
 | `-a, --arch <arch>` | Target architecture (`x86_64`, `aarch64`, or `all`/`parallel`) | `x86_64` |
 | `--aarch64`, `--arm64` | Run benchmark on `aarch64` (Graviton3 with NEON) | - |
 | `--x86_64`, `--x64` | Run benchmark on `x86_64` (Ice Lake with AVX-512BW) | - |
