@@ -18,9 +18,11 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64
+            toolchain: nightly
             rustflags: "-C target-feature=+avx2,+sse2 --cfg forced_swar_backend"
           - os: ubuntu-24.04-arm
             arch: aarch64
+            toolchain: stable
             rustflags: "-C target-feature=+neon --cfg forced_swar_backend"
     runs-on: ${{ matrix.os }}
     steps:
@@ -28,14 +30,36 @@ jobs:
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: ${{ matrix.toolchain }}
+          targets: x86_64-unknown-linux-gnu, x86_64-apple-darwin, x86_64-pc-windows-msvc, x86_64-linux-android, x86_64-unknown-freebsd, aarch64-unknown-linux-gnu, aarch64-apple-darwin, aarch64-pc-windows-msvc, aarch64-linux-android, i686-unknown-linux-gnu, i686-pc-windows-msvc, armv7-unknown-linux-gnueabihf, armv7-linux-androideabi, wasm32-unknown-unknown, wasm32-wasip2
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: rust-${{ runner.os }}-${{ matrix.arch }}-stable
+          key: rust-${{ runner.os }}-${{ matrix.arch }}-${{ matrix.toolchain }}
 
       - name: check (${{ matrix.arch }})
         run: RUSTFLAGS="${{matrix.rustflags}}" cargo check --workspace --all-targets --all-features --tests --benches --examples
+
+      - name: check supported targets
+        run: |
+          for target in \
+            x86_64-unknown-linux-gnu \
+            x86_64-apple-darwin \
+            x86_64-pc-windows-msvc \
+            x86_64-linux-android \
+            x86_64-unknown-freebsd \
+            aarch64-unknown-linux-gnu \
+            aarch64-apple-darwin \
+            aarch64-pc-windows-msvc \
+            aarch64-linux-android \
+            i686-unknown-linux-gnu \
+            i686-pc-windows-msvc \
+            armv7-unknown-linux-gnueabihf \
+            armv7-linux-androideabi \
+            wasm32-unknown-unknown \
+            wasm32-wasip2; do
+            cargo check -p ashwa --all-targets --all-features --target "$target"
+          done
 
   x86_64:
     needs: lints
