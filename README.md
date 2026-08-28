@@ -43,24 +43,14 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for detailed documentati
 - [`search_one`](#search_one)
 - [`search_two`](#search_two)
 
-Following benchmarks are evaluated across architectures and SIMD ISA:
+| Specs            | x86_64 (`x64`)                                        | AArch64 (`arm64`)                                 |
+|:-----------------|:------------------------------------------------------|:--------------------------------------------------|
+| SIMD Target      | `AVX-512BW`                                           | `ARM NEON`                                        |
+| CPU Model        | Intel(R) Xeon(R) Platinum 8375C @ 2.90GHz (8C/16T)    | AWS Graviton3 ARM Neoverse-V1 (16C/16T)           |
+| Cache Hierarchy  | L1d: 384 KiB · L1i: 256 KiB · L2: 10 MiB · L3: 54 MiB | L1d: 1 MiB · L1i: 1 MiB · L2: 16 MiB · L3: 32 MiB |
+| Memory Bandwidth | 20.32 GB/s                                            | 76.50 GB/s                                        |
+| Toolchain        | `+nightly`                                            | stable                                            |
 
-- x86_64
-
-  - ISA: `AVX512BW`
-  - Machine: Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T)
-  - Cache: L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB
-  - Triad: 20.32 GiB/s
-  - Toolchain: `+nightly`
-
-- aarch64
-
-  - ISA: `neon`
-  - Machine: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
-  - Cache: L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB
-  - Triad: 76.50 Gib/s
-  - Toolchain: `stable`
-  
 ### `search_one`
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) | ILP (x64) | ILP (arm64) |
