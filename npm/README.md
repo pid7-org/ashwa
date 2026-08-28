@@ -58,6 +58,7 @@ const indexOne = await searchOne(haystack, needleByte);
 ## Benchmarks
 
 - [`searchOne`](#searchone)
+- [`searchTwo`](#searchtwo)
 
 ### `searchOne`
 
@@ -100,3 +101,45 @@ For _x86_64_ machine targeting _WASM SIMD128_ ISA,
 
 Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) ·
 L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 20.63 GB/s · Node.js v22.23.2
+
+### `searchTwo`
+
+#### Native Node.js (V8 N-API)
+
+For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 647.01 ns | 47.17 GiB/s  |
+| L2 Cache   | 512 KiB   | 17.41 µs  | 28.04 GiB/s  |
+| L3 Cache   | 16 MiB    | 657.09 µs | 23.78 GiB/s  |
+| RAM        | 256 MiB   | 22.50 ms  | 11.11 GiB/s  |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB ·
+STREAM Triad: 19.34 GB/s · Node.js v22.23.2
+
+For _aarch64_ machine targeting _NEON_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 1.57 µs   | 19.44 GiB/s  |
+| L2 Cache   | 512 KiB   | 24.37 µs  | 20.03 GiB/s  |
+| L3 Cache   | 16 MiB    | 788.85 µs | 19.81 GiB/s  |
+| RAM        | 256 MiB   | 13.13 ms  | 19.04 GiB/s  |
+
+Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB ·
+STREAM Triad: 75.88 GB/s · Node.js v22.23.2
+
+#### WebAssembly (WASM SIMD128)
+
+For _x86_64_ machine targeting _WASM SIMD128_ ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 2.17 µs   | 14.06 GiB/s  |
+| L2 Cache   | 512 KiB   | 35.10 µs  | 13.91 GiB/s  |
+| L3 Cache   | 16 MiB    | 3.69 ms   | 4.23 GiB/s   |
+| RAM        | 256 MiB   | 51.67 ms  | 4.84 GiB/s   |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) ·
+L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 19.34 GB/s · Node.js v22.23.2
