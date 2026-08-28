@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.1] - 2026-08-29
+
+- Impl of `search_two`, the hardware-accelerated 2-byte substring search
+  - Support for ISA targets: AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, NEON, SIMD128
+  - 64-bit and 32-bit SWAR fallbacks for targets without vector ISAs
+  - native Node.js (N-API), browser (WASM SIMD), and Python (CPython) bindings
+  - throughput and latency profiling suites and tests across all supported ecosystems
+- build x86_64 native npm and PyPI release artifacts with AVX-512BW feature flags on nightly
+- improved cross-platform testing in CI
+
 ## [0.2.0] - 2026-08-23
 
 - optimize AArch64 NEON single-byte search with 256-byte loop unrolling across 16 vector registers

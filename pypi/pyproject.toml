@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ashwa"
-version = "0.2.0"
+version = "0.2.1"
 description = "Hardware accelerated routines for single substring search"
 readme = "README.md"
 license = { text = "MIT OR Apache-2.0" }
