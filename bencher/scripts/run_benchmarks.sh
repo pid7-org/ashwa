@@ -215,19 +215,21 @@ echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "--------------------------------------------------------------------------------"
 
-# Ensure NPM native module is compiled for host architecture
+# Ensure NPM native module is compiled for host architecture with matching RUSTFLAGS
 if [ -d "$HOME/ashwa/npm" ]; then
     (
         cd "$HOME/ashwa/npm"
-        if [ "$ARCH_UNAME" = "x86_64" ] && [ ! -f "native/index.linux-x64-gnu.node" ]; then
-            (cd native && $CARGO_CMD build --release >/dev/null 2>&1 || true)
-            [ -f "../target/release/libashwa_node.so" ] && cp -f "../target/release/libashwa_node.so" "native/index.linux-x64-gnu.node"
-            [ -f "../../target/release/libashwa_node.so" ] && cp -f "../../target/release/libashwa_node.so" "native/index.linux-x64-gnu.node"
-        elif [ "$ARCH_UNAME" = "aarch64" ] || [ "$ARCH_UNAME" = "arm64" ]; then
-            if [ ! -f "native/index.linux-arm64-gnu.node" ]; then
-                (cd native && $CARGO_CMD build --release >/dev/null 2>&1 || true)
-                [ -f "../target/release/libashwa_node.so" ] && cp -f "../target/release/libashwa_node.so" "native/index.linux-arm64-gnu.node"
-                [ -f "../../target/release/libashwa_node.so" ] && cp -f "../../target/release/libashwa_node.so" "native/index.linux-arm64-gnu.node"
+        (cd native && RUSTFLAGS="$RUSTFLAGS" $CARGO_CMD build --release >/dev/null 2>&1 || true)
+        
+        target_lib="../../target/release/libashwa_node.so"
+        [ ! -f "$target_lib" ] && target_lib="../target/release/libashwa_node.so"
+        [ ! -f "$target_lib" ] && target_lib="target/release/libashwa_node.so"
+
+        if [ -f "$target_lib" ]; then
+            if [ "$ARCH_UNAME" = "x86_64" ]; then
+                cp -f "$target_lib" "native/index.linux-x64-gnu.node"
+            elif [ "$ARCH_UNAME" = "aarch64" ] || [ "$ARCH_UNAME" = "arm64" ]; then
+                cp -f "$target_lib" "native/index.linux-arm64-gnu.node"
             fi
         fi
     ) || true
@@ -274,17 +276,19 @@ echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "--------------------------------------------------------------------------------"
 
-# Ensure Python native C-extension is compiled for host architecture
+# Ensure Python native C-extension is compiled for host architecture with matching RUSTFLAGS
 if [ -d "$HOME/ashwa/pypi" ]; then
     (
         cd "$HOME/ashwa/pypi"
-        if [ ! -f "python/ashwa/ashwa.so" ] && [ ! -f "python/ashwa/ashwa.cpython-"*".so" ]; then
-            $CARGO_CMD build --release >/dev/null 2>&1 || true
-            if [ -f "../target/release/libashwa.so" ]; then
-                cp -f "../target/release/libashwa.so" "python/ashwa/ashwa.so"
-            elif [ -f "../../target/release/libashwa.so" ]; then
-                cp -f "../../target/release/libashwa.so" "python/ashwa/ashwa.so"
-            fi
+        RUSTFLAGS="$RUSTFLAGS" $CARGO_CMD build --release >/dev/null 2>&1 || true
+
+        target_lib="../target/release/libashwa.so"
+        [ ! -f "$target_lib" ] && target_lib="../../target/release/libashwa.so"
+        [ ! -f "$target_lib" ] && target_lib="target/release/libashwa.so"
+
+        if [ -f "$target_lib" ]; then
+            mkdir -p python/ashwa
+            cp -f "$target_lib" "python/ashwa/ashwa.so"
         fi
     ) || true
 fi
