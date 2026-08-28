@@ -2,6 +2,8 @@
 //!
 //! ## Example
 //!
+//! ### `search_one`
+//!
 //! ```
 //! use ashwa::search_one;
 //!
@@ -9,6 +11,17 @@
 //! assert_eq!(search_one(haystack, b'f'), Some(0x10));
 //! assert_eq!(search_one(haystack, b'z'), Some(0x25));
 //! assert_eq!(search_one(haystack, b'!'), None);
+//! ```
+//!
+//! ### `search_two`
+//!
+//! ```
+//! use ashwa::search_two;
+//!
+//! let haystack = b"The quick brown fox jumps over the lazy dog";
+//! assert_eq!(search_two(haystack, *b"qu"), Some(0x04));
+//! assert_eq!(search_two(haystack, *b"ox"), Some(0x11));
+//! assert_eq!(search_two(haystack, *b"!!"), None);
 //! ```
 
 #![cfg_attr(not(test), no_std)]
