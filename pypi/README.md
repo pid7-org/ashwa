@@ -69,12 +69,12 @@ For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
 
 | Level      | Payload   | Latency   | Throughput   |
 |:-----------|:----------|:----------|:-------------|
-| L1 Cache   | 32 KiB    | 682.87 ns | 44.69 GiB/s  |
-| L2 Cache   | 512 KiB   | 10.08 µs  | 48.45 GiB/s  |
-| L3 Cache   | 16 MiB    | 524.71 µs | 29.78 GiB/s  |
-| RAM        | 256 MiB   | 22.40 ms  | 11.16 GiB/s  |
+| L1 Cache   | 32 KiB    | 404.35 ns | 75.47 GiB/s  |
+| L2 Cache   | 512 KiB   | 10.21 µs  | 47.81 GiB/s  |
+| L3 Cache   | 16 MiB    | 553.24 µs | 28.24 GiB/s  |
+| RAM        | 256 MiB   | 20.17 ms  | 12.39 GiB/s  |
 
-Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 21.07 GB/s · Python 3.12.3
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 20.94 GB/s · Python 3.12.3
 
 For _aarch64_ machine targeting _NEON_ SIMD ISA,
 
