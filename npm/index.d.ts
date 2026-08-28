@@ -26,7 +26,33 @@
  */
 export function searchOne(
   haystack: Uint8Array,
-  needle: number
+  needle: number,
+): number | null | Promise<number | null>;
+
+/**
+ * Searches for the first occurrence of a two-byte `needle` within `haystack` (Uint8Array / Buffer).
+ *
+ * Execution backend:
+ * - **Node.js / Bun / Deno**: Executes synchronously via N-API native bindings with SIMD vectorization (AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON).
+ * - **Browser / WebWorker**: Executes via WebAssembly SIMD (`simd128`), automatically initializing the WASM module on first invocation if not already loaded.
+ *
+ * @param haystack - The byte array/buffer to search.
+ * @param needle - A 2-byte sequence (`Uint8Array`, `Buffer`, or `[number, number]` / `number[]`) to locate.
+ * @returns The 0-based byte index of the first occurrence of `needle`, or `null` if not found.
+ *
+ * @example
+ * ```javascript
+ * import { searchTwo } from '@pid7/ashwa';
+ *
+ * const haystack = new TextEncoder().encode("Hello, World!");
+ * const needle = new Uint8Array(["W".charCodeAt(0), "o".charCodeAt(0)]);
+ * const index = await searchTwo(haystack, needle);
+ * console.log(index); // 7
+ * ```
+ */
+export function searchTwo(
+  haystack: Uint8Array,
+  needle: Uint8Array | [number, number] | number[],
 ): number | null | Promise<number | null>;
 
 /**
