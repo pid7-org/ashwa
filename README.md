@@ -55,6 +55,7 @@ fn main() {
 ## Benchmarks
 
 - [`search_one`](#search_one)
+- [`search_two`](#search_two)
 
 ### `search_one`
 
@@ -81,3 +82,29 @@ For _aarch64_ machine targeting _NEON_ SIMD ISA,
 
 Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB ·
 STREAM Triad: 76.50 GB/s
+
+### `search_two`
+
+For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   | ILP           |
+|:-----------|:----------|:----------|:-------------|:--------------|
+| L1 Cache   | 32 KiB    | 427.57 ns | 71.37 GiB/s  | 1.68 insn/cyc |
+| L2 Cache   | 512 KiB   | 6.85 µs   | 71.27 GiB/s  | 1.84 insn/cyc |
+| L3 Cache   | 16 MiB    | 506.58 µs | 30.84 GiB/s  | 0.82 insn/cyc |
+| RAM        | 256 MiB   | 21.28 ms  | 11.75 GiB/s  | 0.30 insn/cyc |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) ·
+L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 19.34 GB/s · _+nightly_ toolchain
+
+For _aarch64_ machine targeting _NEON_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   | ILP           |
+|:-----------|:----------|:----------|:-------------|:--------------|
+| L1 Cache   | 32 KiB    | 1.48 µs   | 20.61 GiB/s  | 3.25 insn/cyc |
+| L2 Cache   | 512 KiB   | 23.76 µs  | 20.55 GiB/s  | 4.10 insn/cyc |
+| L3 Cache   | 16 MiB    | 783.73 µs | 19.94 GiB/s  | 4.06 insn/cyc |
+| RAM        | 256 MiB   | 13.10 ms  | 19.08 GiB/s  | 3.92 insn/cyc |
+
+Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB ·
+STREAM Triad: 75.88 GB/s

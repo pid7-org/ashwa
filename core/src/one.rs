@@ -13,10 +13,6 @@
 //!
 //! ## Benchmarks
 //!
-//! - [`search_one`](#search_one)
-//!
-//! ### `search_one`
-//!
 //! For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
 //!
 //! | Level      | Payload   | Latency   | Throughput   | ILP           |
