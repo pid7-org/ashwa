@@ -25,6 +25,10 @@ targets = [
 name = "one_throughput"
 harness = false
 
+[[bench]]
+name = "two_throughput"
+harness = false
+
 [[example]]
 name = "one_ilp"
 
