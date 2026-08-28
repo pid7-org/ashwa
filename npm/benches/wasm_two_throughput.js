@@ -2,15 +2,15 @@
  * Ashwa searchTwo Throughput & Latency Microbenchmark Suite (WebAssembly SIMD128)
  */
 
-const fs = require("fs");
-const path = require("path");
-const wasm = require("../wasm/pkg/ashwa_wasm.js");
+import { readFileSync } from "fs";
+import { join } from "path";
+import { initSync, searchTwo as _searchTwo } from "../wasm/pkg/ashwa_wasm.js";
 
-const wasmPath = path.join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
-const wasmBytes = fs.readFileSync(wasmPath);
-wasm.initSync({ module: wasmBytes });
+const wasmPath = join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
+const wasmBytes = readFileSync(wasmPath);
+initSync({ module: wasmBytes });
 
-const searchTwo = wasm.searchTwo;
+const searchTwo = _searchTwo;
 
 const KB = 0x400;
 const MB = KB * KB;
@@ -151,7 +151,7 @@ if (require.main === module) {
   main();
 }
 
-module.exports = {
+export default {
   benchmarkTier,
   printTable,
   TIERS,

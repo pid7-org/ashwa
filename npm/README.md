@@ -35,13 +35,12 @@ npm install @pid7/ashwa
 ### ESM & CommonJS (Node.js, Bun, Deno)
 
 ```javascript
-import { searchOne } from '@pid7/ashwa';
+import { searchOne, searchTwo } from '@pid7/ashwa';
 
-const haystack = new TextEncoder().encode("Hello, World! Fast SIMD Search.");
-const needle = "W".charCodeAt(0);
+const haystack = new TextEncoder().encode("The quick brown fox jumps over the lazy dog");
 
-const index = searchOne(haystack, needle);
-console.log(`Found 'W' at byte index: ${index}`);
+const indexOne = searchOne(haystack, "f".charCodeAt(0));
+console.log(`Found 'f' at byte index: ${indexOne}`); // 16
 ```
 
 ### WASM (Browser / WebWorker)
@@ -50,12 +49,10 @@ console.log(`Found 'W' at byte index: ${index}`);
 > In browser/WebWorker environments, WASM automatically initializes on the first call.
 
 ```javascript
-import { init, searchOne } from '@pid7/ashwa';
+import { init, searchOne} from '@pid7/ashwa';
 
-// Optional pre-initialization of WASM module during app startup
-await init();
-
-const index = searchOne(haystack, needle);
+await init(); // optional pre-initialization of WASM module during app startup
+const indexOne = await searchOne(haystack, needleByte);
 ```
 
 ## Benchmarks

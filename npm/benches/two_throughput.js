@@ -2,7 +2,7 @@
  * Ashwa Throughput & Latency Microbenchmark Suite (Node.js / V8 Native N-API)
  */
 
-const { searchTwo } = require("../index.js");
+import { searchTwo } from "../index.js";
 
 const KB = 0x400;
 const MB = KB * KB;
@@ -24,16 +24,19 @@ function formatSize(bytes) {
   } else if (bytes >= KB) {
     return `${Math.floor(bytes / KB)} KiB`;
   }
+
   return `${bytes} B`;
 }
 
 function formatLatency(secs) {
   const nanos = secs * 1e9;
+
   if (nanos < 0x3e8) {
     return `${nanos.toFixed(2)} ns`;
   } else if (nanos < 0xf4240) {
     return `${(nanos / 0x3e8).toFixed(2)} µs`;
   }
+
   return `${(nanos / 0xf4240).toFixed(2)} ms`;
 }
 
@@ -140,7 +143,7 @@ if (require.main === module) {
   main();
 }
 
-module.exports = {
+export default {
   benchmarkTier,
   printTable,
   TIERS,
