@@ -9,6 +9,17 @@
 
 Hardware accelerated routines for single substring search
 
+## Index
+
+- [Language Ecosystems](#language-ecosystems)
+- [Supported Targets](#supported-targets)
+- [`AVX512` Support](#avx512-support)
+- [Installation](#installation)
+- [API](#api)
+- [Benchmarks](#benchmarks)
+  - [`search_one`](#search_one)
+  - [`search_two`](#search_two)
+
 ## Language Ecosystems
 
 - [`rust`](#)
@@ -28,8 +39,8 @@ Hardware accelerated routines for single substring search
 ## `AVX512` Support
 
 > [!IMPORTANT]
-> The `AVX512BW` ISA backend requires the **nightly** toolchain and an explicit target feature flags passed
-> at compile-time.
+> The `AVX512BW` ISA backend requires the **nightly** toolchain and explicit target feature flags passed at
+> compile-time.
 >
 > On stable toolchains or when flags are omitted, `ashwa` gracefully falls back to AVX2 / SSE4.2 / SWAR routines
 > with zero overhead.
@@ -53,7 +64,7 @@ ashwa = "0.2.0"
 
 ## API
 
-Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for detailed documentation.
+Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate documentation and API reference.
 
 ## Benchmarks
 
