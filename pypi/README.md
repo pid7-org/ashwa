@@ -61,6 +61,7 @@ Returns the **0-based byte index** of the first match, or `None` if not found.
 ## Benchmarks
 
 - [`search_one`](#search_one)
+- [`search_two`](#search_two)
 
 ### `search_one`
 
@@ -85,3 +86,27 @@ For _aarch64_ machine targeting _NEON_ SIMD ISA,
 | RAM        | 256 MiB   | 9.50 ms   | 26.33 GiB/s  |
 
 Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB · STREAM Triad: 77.35 GB/s · Python 3.12.3
+
+### `search_two`
+
+For _x86_64_ machine targeting _AVX-512BW_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 727.09 ns | 41.97 GiB/s  |
+| L2 Cache   | 512 KiB   | 17.44 µs  | 27.99 GiB/s  |
+| L3 Cache   | 16 MiB    | 656.31 µs | 23.81 GiB/s  |
+| RAM        | 256 MiB   | 22.26 ms  | 11.23 GiB/s  |
+
+Benchmarked using Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T) · L1d: 384 KiB, L1i: 256 KiB, L2: 10 MiB, L3: 54 MiB · STREAM Triad: 19.34 GB/s · Python 3.12.3
+
+For _aarch64_ machine targeting _NEON_ SIMD ISA,
+
+| Level      | Payload   | Latency   | Throughput   |
+|:-----------|:----------|:----------|:-------------|
+| L1 Cache   | 32 KiB    | 1.67 µs   | 18.32 GiB/s  |
+| L2 Cache   | 512 KiB   | 23.83 µs  | 20.49 GiB/s  |
+| L3 Cache   | 16 MiB    | 782.46 µs | 19.97 GiB/s  |
+| RAM        | 256 MiB   | 13.04 ms  | 19.17 GiB/s  |
+
+Benchmarked using ARM Neoverse-V1 (16C/16T) · L1d: 1 MiB, L1i: 1 MiB, L2: 16 MiB, L3: 32 MiB · STREAM Triad: 75.88 GB/s · Python 3.12.3
