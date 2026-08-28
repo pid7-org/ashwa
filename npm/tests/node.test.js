@@ -1,6 +1,6 @@
-import { test, describe } from "node:test";
-import { strictEqual, throws } from "node:assert/strict";
-import { searchOne, searchTwo, isNative, init, initSync } from "../index.js";
+const { test, describe } = require("node:test");
+const { strictEqual, throws } = require("node:assert/strict");
+const { searchOne, searchTwo, isNative, init, initSync } = require("../index.js");
 
 describe("Node Native Backend (napi-rs)", () => {
   test("Environment & exports verification", async () => {

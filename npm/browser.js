@@ -4,8 +4,8 @@
  * @module @pid7/ashwa/browser
  */
 
-import { readFileSync } from "fs";
-import { join } from "path";
+const { readFileSync } = require("fs");
+const { join } = require("path");
 
 let wasmModule = null;
 let initPromise = null;
@@ -97,7 +97,7 @@ async function searchTwo(haystack, needle) {
   return res !== undefined && res !== null ? Number(res) : null;
 }
 
-export default {
+module.exports = {
   /**
    * `false` indicating WebAssembly execution mode.
    */

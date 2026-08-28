@@ -1,6 +1,6 @@
-import { test, describe } from "node:test";
-import { strictEqual, rejects } from "node:assert/strict";
-import { searchOne, searchTwo, isNative, init, initSync } from "../browser.js";
+const { test, describe } = require("node:test");
+const { strictEqual, rejects } = require("node:assert/strict");
+const { searchOne, searchTwo, isNative, init, initSync } = require("../browser.js");
 
 describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
   test("Environment & exports verification", async () => {
