@@ -46,8 +46,15 @@ assert ashwa.search_one(haystack, ord("!")) is None
 
 #### `ashwa.search_one(haystack, needle) -> int | None`
 
-Search for the first occurrence of `needle` (an `int` 0–255) in `haystack`
-(`bytes`, `bytearray`, or `memoryview`).
+Search for the first occurrence of `needle` (an `int` 0–255) in `haystack` (`bytes`, `bytearray`,
+or `memoryview`).
+
+Returns the **0-based byte index** of the first match, or `None` if not found.
+
+#### `ashwa.search_two(haystack, needle) -> int | None`
+
+Search for the first occurrence of a two-byte `needle` (a 2-byte sequence such as `bytes`, `bytearray`,
+`memoryview`, `tuple[int, int]`, or `list[int]`) in `haystack` (`bytes`, `bytearray`, or `memoryview`).
 
 Returns the **0-based byte index** of the first match, or `None` if not found.
 
