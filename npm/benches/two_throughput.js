@@ -2,7 +2,7 @@
  * Ashwa Throughput & Latency Microbenchmark Suite (Node.js / V8 Native N-API)
  */
 
-import { searchTwo } from "../index.js";
+const { searchTwo } = require("../index.js");
 
 const KB = 0x400;
 const MB = KB * KB;
@@ -143,7 +143,7 @@ if (require.main === module) {
   main();
 }
 
-export default {
+module.exports = {
   benchmarkTier,
   printTable,
   TIERS,
