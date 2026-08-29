@@ -13,20 +13,25 @@ import ashwa
 
 KB = 0x400
 MB = KB * KB
+GB = 0x400 * MB
 SAMPLES = 0x200
 
 TIERS = [
-    {"name": "L1 Cache", "size": 0x20 * KB},
-    {"name": "L2 Cache", "size": 0x200 * KB},
-    {"name": "L3 Cache", "size": 0x10 * MB},
-    {"name": "Memory Bound (RAM)", "size": 0x100 * MB},
+    {"name": "L1", "size": 0x20 * KB},
+    {"name": "L2", "size": 0x200 * KB},
+    {"name": "L3", "size": 0x10 * MB},
+    {"name": "RAM", "size": 0x100 * MB},
+    {"name": "RAM", "size": 0x200 * MB},
+    {"name": "RAM", "size": 1 * GB},
 ]
 
 # Anti-DCE (Dead Code Elimination) optimization barrier sink
 black_hole = None
 
 def format_size(bytes_count: int) -> str:
-    if bytes_count >= MB:
+    if bytes_count >= GB:
+        return f"{bytes_count // GB} GiB"
+    elif bytes_count >= MB:
         return f"{bytes_count // MB} MiB"
     elif bytes_count >= KB:
         return f"{bytes_count // KB} KiB"
@@ -35,11 +40,13 @@ def format_size(bytes_count: int) -> str:
 
 def format_latency(secs: float) -> str:
     nanos = secs * 1e9
-    if nanos < 0x3E8:
+    if nanos < 1_000.0:
         return f"{nanos:.2f} ns"
-    elif nanos < 0xF4240:
-        return f"{nanos / 0x3E8:.2f} µs"
-    return f"{nanos / 0xF4240:.2f} ms"
+    elif nanos < 1_000_000.0:
+        return f"{nanos / 1_000.0:.2f} µs"
+    elif nanos < 1_000_000_000.0:
+        return f"{nanos / 1_000_000.0:.2f} ms"
+    return f"{secs:.2f} s"
 
 def benchmark_tier(tier: dict, haystack: bytearray, needle: int) -> dict:
     global black_hole
@@ -53,13 +60,13 @@ def benchmark_tier(tier: dict, haystack: bytearray, needle: int) -> dict:
 
     while (
         (time.perf_counter_ns() - warmup_start) < 0x5F5E100  # 100ms
-        or warmup_iters < 0x40  
-    ):
+        and warmup_iters < 0x40
+    ) or warmup_iters < 2:
         black_hole = search_one(view, needle)
         warmup_iters += 1
 
     probe_start = time.perf_counter_ns()
-    probe_iters = max(0x14, warmup_iters // 0xA)
+    probe_iters = max(0x0A, warmup_iters // 0x0A)
 
     for _ in range(probe_iters):
         black_hole = search_one(view, needle)
@@ -81,7 +88,7 @@ def benchmark_tier(tier: dict, haystack: bytearray, needle: int) -> dict:
 
     sample_durations.sort()
     median_secs = sample_durations[len(sample_durations) // 2]
-    gib_per_sec = (size / (0x400 * 0x400 * 0x400)) / median_secs
+    gib_per_sec = (size / (1024.0 * 1024.0 * 1024.0)) / median_secs
 
     return {
         "name": tier["name"],
@@ -97,7 +104,7 @@ def print_table(results: list) -> None:
     col_thrpt = "Throughput"
 
     w_tier = 0x16  
-    w_size = 0xA   
+    w_size = 0x0A   
     w_lat = 0x12   
     w_thrpt = 0x10 
 
