@@ -6,13 +6,17 @@
 
 Hardware accelerated routines for single substring search
 
-> 💡 **Tip:** `ashwa` provides native CPython extension bindings powered by Rust and SIMD vectorization.
->
-> ℹ️ **Note:** The best available SIMD instruction set (AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON) is detected automatically at runtime on the host CPU with seamless fallback to SWAR routines.
+> 💡 TIP:
+> `ashwa` provides native CPython extension bindings powered by Rust and SIMD vectorization.
+
+> ℹ️ NOTE:
+> The best available SIMD instruction set (AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON) is detected
+> automatically at runtime on the host CPU with seamless fallback to SWAR routines.
 
 ## Index
 
 - [Supported Platforms](#supported-platforms)
+- [`AVX512` Support](#avx512-support)
 - [Installation](#installation)
 - [API Reference](#api-reference)
   - [`search_one`](#search_one)
@@ -29,6 +33,13 @@ Hardware accelerated routines for single substring search
 | i686 (x86)      | Linux, Windows                               | SSE2                                  | 32-bit SWAR |
 | AArch64 (ARM64) | Apple Silicon, Linux ARM64, Android, FreeBSD | 128-bit ARM NEON                      | 64-bit SWAR |
 | ARMv7           | Linux ARM, Android                           | 128-bit ARM NEON                      | 32-bit SWAR |
+
+## `AVX512` Support
+
+> ℹ️ NOTE:
+> On x86_64 machines where the `AVX512BW` ISA is supported by the CPU, `ashwa` automatically detects and uses
+> the ISA for hardware acceleration at runtime. Unlike Rust, no nightly toolchain, compile-time flags, or extra
+> setup are required.
 
 ## Installation
 
