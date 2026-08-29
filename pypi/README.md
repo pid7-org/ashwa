@@ -95,31 +95,35 @@ Searches for the first occurrence of a two-byte `needle` within `haystack`.
 > Benchmarks are evaluated across dedicated AWS EC2 hardware environments on Python `3.12.3`,
 >
 > * x86_64 (_x64_)
->   * Instance: Intel(R) Xeon(R) Platinum 8375C CPU @ 2.90GHz (8C/16T)
+>   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
 >   * ISA: _AVX-512BW_ (`+nightly`)
->   * Cache: L1d: 384 KiB · L1i: 256 KiB · L2: 10 MiB · L3: 54 MiB
->   * STREAM Triad: 20.94 GiB/s
+>   * Cache: L1d: 384 KiB · L1i: 256 KiB · L2: 16 MiB · L3: 105 MiB
+>   * STREAM Triad: 25.76 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
 >   * ISA: _NEON_ (stable)
 >   * Cache: L1d: 1 MiB · L1i: 1 MiB · L2: 16 MiB · L3: 32 MiB
->   * STREAM Triad: 77.35 GiB/s
+>   * STREAM Triad: 75.48 GiB/s
 
 ### `search_one`
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
 |:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
-| L1 Cache   | 32 KiB    | 404.35 ns     | 779.68 ns       | 75.47 GiB/s      | 39.14 GiB/s        |
-| L2 Cache   | 512 KiB   | 10.21 µs      | 10.93 µs        | 47.81 GiB/s      | 44.68 GiB/s        |
-| L3 Cache   | 16 MiB    | 553.24 µs     | 364.89 µs       | 28.24 GiB/s      | 42.82 GiB/s        |
-| RAM        | 256 MiB   | 20.17 ms      | 9.50 ms         | 12.39 GiB/s      | 26.33 GiB/s        |
+| L1 Cache   | 32 KiB    | 304.09 ns     | 864.09 ns       | 100.36 GiB/s     | 35.32 GiB/s        |
+| L2 Cache   | 512 KiB   | 6.89 µs       | 11.93 µs        | 70.82 GiB/s      | 40.94 GiB/s        |
+| L3 Cache   | 16 MiB    | 488.96 µs     | 397.55 µs       | 31.96 GiB/s      | 39.30 GiB/s        |
+| RAM        | 256 MiB   | 20.35 ms      | 10.33 ms        | 12.28 GiB/s      | 24.21 GiB/s        |
+| RAM        | 512 MiB   | 41.72 ms      | 20.94 ms        | 11.98 GiB/s      | 23.88 GiB/s        |
+| RAM        | 1 GiB     | 83.63 ms      | 39.15 ms        | 11.96 GiB/s      | 25.54 GiB/s        |
 
 ### `search_two`
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
 |:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
-| L1 Cache   | 32 KiB    | 727.09 ns     | 1.67 µs         | 41.97 GiB/s      | 18.32 GiB/s        |
-| L2 Cache   | 512 KiB   | 17.44 µs      | 23.83 µs        | 27.99 GiB/s      | 20.49 GiB/s        |
-| L3 Cache   | 16 MiB    | 656.31 µs     | 782.46 µs       | 23.81 GiB/s      | 19.97 GiB/s        |
-| RAM        | 256 MiB   | 22.26 ms      | 13.04 ms        | 11.23 GiB/s      | 19.17 GiB/s        |
+| L1 Cache   | 32 KiB    | 611.86 ns     | 1.67 µs         | 49.88 GiB/s      | 18.31 GiB/s        |
+| L2 Cache   | 512 KiB   | 10.77 µs      | 24.31 µs        | 45.33 GiB/s      | 20.08 GiB/s        |
+| L3 Cache   | 16 MiB    | 558.87 µs     | 768.98 µs       | 27.96 GiB/s      | 20.32 GiB/s        |
+| RAM        | 256 MiB   | 19.94 ms      | 13.03 ms        | 12.54 GiB/s      | 19.18 GiB/s        |
+| RAM        | 512 MiB   | 41.67 ms      | 26.06 ms        | 12.00 GiB/s      | 19.18 GiB/s        |
+| RAM        | 1 GiB     | 83.56 ms      | 52.04 ms        | 11.97 GiB/s      | 19.22 GiB/s        |
