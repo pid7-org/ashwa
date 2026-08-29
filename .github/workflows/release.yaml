@@ -286,10 +286,10 @@ jobs:
         id: auth
 
       - name: Dry Run — crates.io
-        run: cargo publish --dry-run --locked
+        run: cargo publish --dry-run --locked -p ashwa
 
       - name: Publish — crates.io
-        run: cargo publish --locked
+        run: cargo publish --locked -p ashwa
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
@@ -698,7 +698,9 @@ jobs:
           cat << 'EOF' > wasm.test.js
           const { test, describe } = require("node:test");
           const { strictEqual, rejects } = require("node:assert/strict");
-          const { searchOne, searchTwo, isNative, init, initSync } = require("@pid7/ashwa/browser");
+          const path = require("node:path");
+          const packageDir = path.dirname(require.resolve("@pid7/ashwa/package.json"));
+          const { searchOne, searchTwo, isNative, init, initSync } = require(path.join(packageDir, "browser.js"));
 
           describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
             test("Environment & exports verification", async () => {
@@ -935,7 +937,15 @@ jobs:
           cat << 'EOF' > wasm.test.mjs
           import { test, describe } from "node:test";
           import assert from "node:assert/strict";
-          import { searchOne, searchTwo, isNative, init, initSync } from "@pid7/ashwa";
+          import { createRequire } from "node:module";
+          import path from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const require = createRequire(import.meta.url);
+          const packageDir = path.dirname(require.resolve("@pid7/ashwa/package.json"));
+          const { searchOne, searchTwo, isNative, init, initSync } = await import(
+            pathToFileURL(path.join(packageDir, "browser.mjs")).href
+          );
 
           describe("WebAssembly Backend ESM (@pid7/ashwa/browser)", () => {
             test("ESM exports and basic search", async () => {
