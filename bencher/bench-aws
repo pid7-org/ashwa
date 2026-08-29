@@ -190,6 +190,8 @@ if [ -z "$BENCH_TARGET" ]; then
     fi
 fi
 
+RESULTS_DIR="${SCRIPT_DIR}/results/${BENCH_TARGET}"
+
 # Normalize and resolve git ref
 if [ "${GIT_REF,,}" = "head" ]; then
     GIT_REF="HEAD"
@@ -475,6 +477,7 @@ REMOTE_BOOTSTRAP
 
     log "[5/5] Fetching results and teardown..."
     mkdir -p "$arch_results_dir"
+    scp -r $ssh_opts "ubuntu@$public_ip:/home/ubuntu/results/${BENCH_TARGET}/*" "$arch_results_dir/" >/dev/null 2>&1 || \
     scp -r $ssh_opts "ubuntu@$public_ip:/home/ubuntu/results/*" "$arch_results_dir/" >/dev/null 2>&1 || true
 
     # Backwards compatibility: copy to root results dir if single run

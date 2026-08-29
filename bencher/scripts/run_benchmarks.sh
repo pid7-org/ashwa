@@ -60,7 +60,7 @@ else
     ILP_EXAMPLE="two_ilp"
 fi
 
-RESULTS_DIR="${HOME}/results"
+RESULTS_DIR="${RESULTS_DIR:-${HOME}/results/${BENCH_TARGET}}"
 
 mkdir -p "$RESULTS_DIR"
 SUMMARY_FILE="${RESULTS_DIR}/summary.txt"
@@ -242,7 +242,7 @@ echo "--------------------------------------------------------------------------
 echo " [2/5] RUST CORE: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
 echo " Toolchain:      $CARGO_CMD"
 echo " Target Feature: $HIGHEST_ISA ($RUSTFLAGS)"
-echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
+echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB, 512 MiB, 1 GiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "--------------------------------------------------------------------------------"
 
@@ -264,7 +264,7 @@ echo "--------------------------------------------------------------------------
 echo " [3/5] NPM BINDINGS: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
 echo " Node.js:        $NODE_VERSION"
 echo " Architecture:   $ARCH_UNAME"
-echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
+echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB, 512 MiB, 1 GiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "--------------------------------------------------------------------------------"
 
@@ -325,7 +325,7 @@ echo "--------------------------------------------------------------------------
 echo " [4/5] PYTHON BINDINGS: THROUGHPUT & LATENCY BENCHMARK ($SUITE_TITLE)"
 echo " Python:         $PYTHON_VERSION"
 echo " Architecture:   $ARCH_UNAME"
-echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB)"
+echo " Payload Tiers:  L1 (32 KiB), L2 (512 KiB), L3 (16 MiB), RAM (256 MiB, 512 MiB, 1 GiB)"
 echo " CPU Pinning:    Core $CPU_CORE"
 echo "--------------------------------------------------------------------------------"
 

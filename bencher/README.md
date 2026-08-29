@@ -37,4 +37,12 @@ Automated ephemeral AWS EC2 benchmark orchestrator for `ashwa` across **x86_64**
 | `--on-demand` | Use On-Demand instance instead of Spot | Spot (`true`) |
 | `--keep-alive` | Retain instance on exit (debug only) | `false` |
 
+## Results Structure
+
+Benchmark artifacts are partitioned by benchmark target under `bencher/results/` to prevent overwriting results across different targets:
+
+- `results/one/`: Single-byte search benchmark artifacts (`summary.txt`, throughput logs, architecture subdirectories `x86_64/`, `aarch64/`).
+- `results/two/`: Two-byte search benchmark artifacts (`summary.txt`, throughput logs, architecture subdirectories `x86_64/`, `aarch64/`).
+
+
 
