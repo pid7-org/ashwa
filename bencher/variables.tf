@@ -1,7 +1,7 @@
 variable "aws_region" {
   type        = string
   default     = "us-east-1"
-  description = "AWS region (us-east-1 has broad availability of c6i/m6i and m7g instances)"
+  description = "AWS region (us-east-1 has broad availability of c7i/m7i and m7g instances)"
 }
 
 variable "aws_profile" {
@@ -19,7 +19,7 @@ variable "arch" {
 variable "instance_type" {
   type        = string
   default     = ""
-  description = "EC2 instance type (defaults to m6i.4xlarge for x86_64 and m7g.4xlarge for aarch64 - 64 GiB RAM, 16 vCPUs)"
+  description = "EC2 instance type (defaults to m7i.4xlarge for x86_64 and m7g.4xlarge for aarch64 - 64 GiB DDR5 RAM, 16 vCPUs)"
 }
 
 variable "use_spot" {

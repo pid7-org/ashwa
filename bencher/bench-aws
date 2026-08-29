@@ -19,9 +19,9 @@ USE_SPOT="true"
 CPU_CORE=2
 KEEP_ALIVE="false"
 
-# Defaults strictly configured for 64 GiB RAM and <= 16 vCPUs
-DEFAULT_X86_INSTANCE="m6i.4xlarge"  # 16 vCPUs, 64 GiB RAM (Intel Ice Lake AVX-512BW)
-DEFAULT_ARM_INSTANCE="m7g.4xlarge"  # 16 vCPUs, 64 GiB RAM (AWS Graviton3 ARM NEON)
+# Defaults strictly configured for 64 GiB DDR5 RAM and <= 16 vCPUs
+DEFAULT_X86_INSTANCE="m7i.4xlarge"  # 16 vCPUs, 64 GiB DDR5 RAM (Intel Sapphire Rapids AVX-512BW)
+DEFAULT_ARM_INSTANCE="m7g.4xlarge"  # 16 vCPUs, 64 GiB DDR5 RAM (AWS Graviton3 ARM NEON / SVE)
 
 CURRENT_REF=""
 if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -37,7 +37,7 @@ usage() {
 Usage: ./bench-aws [profile] [options]
 
 Ephemeral AWS EC2 Spot benchmark orchestrator for Ashwa. Provisions dedicated
-x86_64 and/or aarch64 instances (64 GiB RAM, <= 16 vCPUs), executes hardware-accelerated
+x86_64 and/or aarch64 instances (64 GiB DDR5 RAM, <= 16 vCPUs), executes hardware-accelerated
 microarchitectural vector benchmarks (AVX-512BW / AVX2 / NEON) with CPU pinning,
 collects artifacts, and automatically tears down cloud resources.
 
@@ -52,11 +52,11 @@ Benchmark Suite (REQUIRED - no default):
 Options:
   -a, --arch <arch>         Target architecture: 'x86_64', 'aarch64', or 'all'/'parallel' (default: x86_64)
       --aarch64, --arm64    Run benchmark on aarch64 (AWS Graviton3 with ARM NEON)
-      --x86_64, --x64       Run benchmark on x86_64 (Intel Xeon Ice Lake with AVX-512BW)
+      --x86_64, --x64       Run benchmark on x86_64 (Intel Xeon Sapphire Rapids with AVX-512BW and DDR5)
       --parallel, --all     Run BOTH x86_64 and aarch64 benchmarks concurrently in parallel
   -i, --instance <type>     Override EC2 Instance Type:
-                              - x86_64 default:  m6i.4xlarge (16 vCPUs, 64 GiB RAM)
-                              - aarch64 default: m7g.4xlarge (16 vCPUs, 64 GiB RAM)
+                              - x86_64 default:  m7i.4xlarge (16 vCPUs, 64 GiB DDR5 RAM)
+                              - aarch64 default: m7g.4xlarge (16 vCPUs, 64 GiB DDR5 RAM)
   -p, --profile <name>      AWS CLI profile name
   -r, --region <region>     AWS Region (default: us-east-1)
   -b, --ref <git-ref>       Git branch, tag, or commit hash (default: current HEAD '$CURRENT_REF')
@@ -504,8 +504,8 @@ echo " Target Arch:   ${EXEC_ARCHES[*]}"
 if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
     echo " Instance Type: $(get_instance_type_for_arch "${EXEC_ARCHES[0]}") (64 GiB RAM, 16 vCPUs)"
 else
-    echo " Instances:     x86_64: $DEFAULT_X86_INSTANCE (Intel Xeon Ice Lake, 16 vCPUs, 64 GiB RAM)"
-    echo "                aarch64: $DEFAULT_ARM_INSTANCE (AWS Graviton3 Neoverse-V1, 16 vCPUs, 64 GiB RAM)"
+    echo " Instances:     x86_64: $DEFAULT_X86_INSTANCE (Intel Xeon Sapphire Rapids, 16 vCPUs, 64 GiB DDR5 RAM)"
+    echo "                aarch64: $DEFAULT_ARM_INSTANCE (AWS Graviton3 Neoverse-V1, 16 vCPUs, 64 GiB DDR5 RAM)"
     echo " Mode:          PARALLEL CONCURRENT EXECUTION"
 fi
 echo " Lifecycle:     $([ "$USE_SPOT" = "true" ] && echo "Spot" || echo "On-Demand")"

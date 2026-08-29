@@ -24,7 +24,7 @@ provider "aws" {
 locals {
   is_arm                = var.arch == "aarch64" || var.arch == "arm64"
   arch_norm             = local.is_arm ? "aarch64" : "x86_64"
-  default_instance_type = local.is_arm ? "m7g.4xlarge" : "m6i.4xlarge"
+  default_instance_type = local.is_arm ? "m7g.4xlarge" : "m7i.4xlarge"
   instance_type         = var.instance_type != "" ? var.instance_type : local.default_instance_type
   key_file_path         = var.ssh_key_path != "" ? var.ssh_key_path : "${path.module}/id_ed25519_${local.arch_norm}"
 }

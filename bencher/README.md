@@ -25,7 +25,7 @@ aws configure
 | `-a, --arch <arch>`     | Target architecture: `x86_64`, `aarch64`, or `all`/`parallel`  | `x86_64`                      |
 | `-p, --profile <name>`  | AWS CLI profile name                                           | `$AWS_PROFILE` / `default`    |
 | `-r, --region <region>` | AWS Region                                                     | `us-east-1`                   |
-| `-i, --instance <type>` | Override EC2 instance type (16 vCPUs, 64 GiB RAM)              | `m6i.4xlarge` / `m7g.4xlarge` |
+| `-i, --instance <type>` | Override EC2 instance type (16 vCPUs, 64 GiB DDR5 RAM)         | `m7i.4xlarge` / `m7g.4xlarge` |
 | `-b, --ref <git-ref>`   | Git branch, tag, or commit hash to benchmark                   | current `HEAD`                |
 | `-c, --core <id>`       | CPU core to pin benchmarks (`taskset`)                         | `2`                           |
 | `--on-demand`           | Use On-Demand instances instead of Spot                        | Spot (`true`)                 |
