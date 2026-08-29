@@ -59,7 +59,7 @@ Add `ashwa` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-ashwa = "0.2.2"
+ashwa = "0.2.3"
 ```
 
 ## API

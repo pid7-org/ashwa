@@ -91,12 +91,12 @@ function requireNative() {
           require("@pid7/ashwa-native-android-arm64/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -117,12 +117,12 @@ function requireNative() {
           require("@pid7/ashwa-native-android-arm-eabi/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -157,12 +157,12 @@ function requireNative() {
             require("@pid7/ashwa-native-win32-x64-gnu/package.json").version;
 
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
 
@@ -183,12 +183,12 @@ function requireNative() {
             require("@pid7/ashwa-native-win32-x64-msvc/package.json").version;
 
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
 
@@ -210,12 +210,12 @@ function requireNative() {
           require("@pid7/ashwa-native-win32-ia32-msvc/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -236,12 +236,12 @@ function requireNative() {
           require("@pid7/ashwa-native-win32-arm64-msvc/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -267,12 +267,12 @@ function requireNative() {
         require("@pid7/ashwa-native-darwin-universal/package.json").version;
 
       if (
-        bindingPackageVersion !== "0.2.2" &&
+        bindingPackageVersion !== "0.2.3" &&
         process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
         process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
       ) {
         throw new Error(
-          `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+          `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
         );
       }
 
@@ -292,12 +292,12 @@ function requireNative() {
         const bindingPackageVersion =
           require("@pid7/ashwa-native-darwin-x64/package.json").version;
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -318,12 +318,12 @@ function requireNative() {
           require("@pid7/ashwa-native-darwin-arm64/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -350,12 +350,12 @@ function requireNative() {
           require("@pid7/ashwa-native-freebsd-x64/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -376,12 +376,12 @@ function requireNative() {
           require("@pid7/ashwa-native-freebsd-arm64/package.json").version;
 
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
 
@@ -409,12 +409,12 @@ function requireNative() {
             require("@pid7/ashwa-native-linux-x64-musl/package.json").version;
 
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
 
@@ -435,12 +435,12 @@ function requireNative() {
             require("@pid7/ashwa-native-linux-x64-gnu/package.json").version;
 
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
 
@@ -463,12 +463,12 @@ function requireNative() {
             require("@pid7/ashwa-native-linux-arm64-musl/package.json").version;
 
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
 
@@ -489,12 +489,12 @@ function requireNative() {
             require("@pid7/ashwa-native-linux-arm64-gnu/package.json").version;
 
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
 
@@ -516,12 +516,12 @@ function requireNative() {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-linux-arm-musleabihf/package.json").version;
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
           return binding;
@@ -539,12 +539,12 @@ function requireNative() {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-linux-arm-gnueabihf/package.json").version;
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
           return binding;
@@ -564,12 +564,12 @@ function requireNative() {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-linux-loong64-musl/package.json").version;
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
           return binding;
@@ -587,12 +587,12 @@ function requireNative() {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-linux-loong64-gnu/package.json").version;
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
           return binding;
@@ -612,12 +612,12 @@ function requireNative() {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-linux-riscv64-musl/package.json").version;
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
           return binding;
@@ -635,12 +635,12 @@ function requireNative() {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-linux-riscv64-gnu/package.json").version;
           if (
-            bindingPackageVersion !== "0.2.2" &&
+            bindingPackageVersion !== "0.2.3" &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
             process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
           ) {
             throw new Error(
-              `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
           return binding;
@@ -659,12 +659,12 @@ function requireNative() {
         const bindingPackageVersion =
           require("@pid7/ashwa-native-linux-ppc64-gnu/package.json").version;
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
         return binding;
@@ -682,12 +682,12 @@ function requireNative() {
         const bindingPackageVersion =
           require("@pid7/ashwa-native-linux-s390x-gnu/package.json").version;
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
         return binding;
@@ -711,12 +711,12 @@ function requireNative() {
         const bindingPackageVersion =
           require("@pid7/ashwa-native-openharmony-arm64/package.json").version;
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
         return binding;
@@ -734,12 +734,12 @@ function requireNative() {
         const bindingPackageVersion =
           require("@pid7/ashwa-native-openharmony-x64/package.json").version;
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
         return binding;
@@ -757,12 +757,12 @@ function requireNative() {
         const bindingPackageVersion =
           require("@pid7/ashwa-native-openharmony-arm/package.json").version;
         if (
-          bindingPackageVersion !== "0.2.2" &&
+          bindingPackageVersion !== "0.2.3" &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK &&
           process.env.NAPI_RS_ENFORCE_VERSION_CHECK !== "0"
         ) {
           throw new Error(
-            `Native binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+            `Native binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
           );
         }
         return binding;
@@ -925,9 +925,9 @@ if (!nativeBinding || forceWasi) {
         ) {
           const bindingPackageVersion =
             require("@pid7/ashwa-native-wasm32-wasi/package.json").version;
-          if (bindingPackageVersion !== "0.2.2") {
+          if (bindingPackageVersion !== "0.2.3") {
             throw new Error(
-              `WASI binding package version mismatch, expected 0.2.2 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
+              `WASI binding package version mismatch, expected 0.2.3 but got ${bindingPackageVersion}. You can reinstall dependencies to fix this issue.`,
             );
           }
         }

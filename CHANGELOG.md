@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.3] - 2026-08-29
+
+- npm: ensure native loader uses CommonJS exports for cross-bundler compatibility
+- add `512 MiB` and `1 GiB` RAM payload tiers across core, npm, and pypi benchmark suites
+- bencher:
+  - upgrade default x86_64 instance to `m7i.4xlarge` (Intel Sapphire Rapids) for DDR5 parity with Graviton3 (`m7g.4xlarge`)
+  - isolate benchmark target results by suite (`search_one` / `search_two`)
+  - add AWS authentication setup guide
+- update benchmark results and documentation across core, npm, and pypi packages
+
 ## [0.2.2] - 2026-08-29
 
 - fix `Illegal instruction` crashes on x86_64 CPUs (machines w/o AVX-512BW ISA)
