@@ -6,14 +6,17 @@
 
 Hardware accelerated routines for single substring search
 
-> 💡 TIP: `@pid7/ashwa` runs seamlessly across Node.js, Bun, Deno, and modern browser / WebWorker environments.
+> 💡 TIP:
+> `@pid7/ashwa` runs seamlessly across Node.js, Bun, Deno, and modern browser / WebWorker environments.
 
-> ℹ️ NOTE: The optimal execution backend (native N-API SIMD bindings for Node / Bun / Deno or WebAssembly
-> SIMD for browsers) is automatically detected and selected at runtime with zero manual configuration.
+> ℹ️ NOTE:
+> The optimal execution backend (native N-API SIMD bindings for Node / Bun / Deno or WebAssembly SIMD for browsers)
+> is automatically detected and selected at runtime with zero manual configuration.
 
 ## Index
 
 - [Supported Platforms](#supported-platforms)
+- [`AVX512` Support](#avx512-support)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Node](#node)
@@ -35,6 +38,13 @@ Hardware accelerated routines for single substring search
 | x86_64          | Linux, macOS, Windows                  | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2 | 64-bit SWAR |
 | AArch64 (ARM64) | Apple Silicon, Linux ARM64             | 128-bit ARM NEON                     | 64-bit SWAR |
 | WebAssembly     | Browsers, WebWorkers, Node.js (wasm32) | WASM SIMD128 (`simd128`)             | 32-bit SWAR |
+
+## `AVX512` Support
+
+> ℹ️ NOTE:
+> On x86_64 machines where the `AVX512BW` ISA is supported by the CPU, `ashwa` automatically detects and uses
+> the ISA for hardware acceleration at runtime. Unlike Rust, no nightly toolchain, compile-time flags, or extra
+> setup are required.
 
 ## Installation
 
