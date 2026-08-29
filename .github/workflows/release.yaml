@@ -406,9 +406,20 @@ jobs:
           cd test-published-package
           npm init -y
 
-          for i in {1..12}; do
-            npm install "@pid7/ashwa@$VERSION" --no-cache && break || sleep 10
+          installed=false
+          for i in {1..30}; do
+            if npm install "@pid7/ashwa@$VERSION" --prefer-online; then
+              installed=true
+              break
+            fi
+            echo "Waiting for @pid7/ashwa@$VERSION on npm registry (attempt $i/30)..."
+            sleep 10
           done
+
+          if [ "$installed" = false ]; then
+            echo "Failed to install @pid7/ashwa@$VERSION from npm registry after 30 attempts."
+            exit 1
+          fi
 
           cat << 'EOF' > test.js
           const { test, describe } = require("node:test");
@@ -689,9 +700,20 @@ jobs:
           cd test-published-wasm
           npm init -y
 
-          for i in {1..12}; do
-            npm install "@pid7/ashwa@$VERSION" --no-cache && break || sleep 10
+          installed=false
+          for i in {1..30}; do
+            if npm install "@pid7/ashwa@$VERSION" --prefer-online; then
+              installed=true
+              break
+            fi
+            echo "Waiting for @pid7/ashwa@$VERSION on npm registry (attempt $i/30)..."
+            sleep 10
           done
+
+          if [ "$installed" = false ]; then
+            echo "Failed to install @pid7/ashwa@$VERSION from npm registry after 30 attempts."
+            exit 1
+          fi
 
           npm install playwright
 
@@ -1083,9 +1105,20 @@ jobs:
         shell: bash
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          for i in {1..12}; do
-            pip install "ashwa==$VERSION" --no-cache-dir && break || sleep 10
+          installed=false
+          for i in {1..30}; do
+            if pip install "ashwa==$VERSION" --no-cache-dir; then
+              installed=true
+              break
+            fi
+            echo "Waiting for ashwa==$VERSION on PyPI (attempt $i/30)..."
+            sleep 10
           done
+
+          if [ "$installed" = false ]; then
+            echo "Failed to install ashwa==$VERSION from PyPI after 30 attempts."
+            exit 1
+          fi
 
           pip install pytest
           cd pypi
