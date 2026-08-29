@@ -14,20 +14,25 @@ const searchTwo = wasm.searchTwo;
 
 const KB = 0x400;
 const MB = KB * KB;
+const GB = 0x400 * MB;
 const SAMPLES = 0x200;
 
 const TIERS = [
-  { name: "L1 Cache", size: 0x20 * KB },
-  { name: "L2 Cache", size: 0x200 * KB },
-  { name: "L3 Cache", size: 0x10 * MB },
-  { name: "Memory Bound (RAM)", size: 0x100 * MB },
+  { name: "L1", size: 0x20 * KB },
+  { name: "L2", size: 0x200 * KB },
+  { name: "L3", size: 0x10 * MB },
+  { name: "RAM", size: 0x100 * MB },
+  { name: "RAM", size: 0x200 * MB },
+  { name: "RAM", size: 1 * GB },
 ];
 
 // Anti-DCE (Dead Code Elimination) optimization barrier sink
 let blackHole = null;
 
 function formatSize(bytes) {
-  if (bytes >= MB) {
+  if (bytes >= GB) {
+    return `${Math.floor(bytes / GB)} GiB`;
+  } else if (bytes >= MB) {
     return `${Math.floor(bytes / MB)} MiB`;
   } else if (bytes >= KB) {
     return `${Math.floor(bytes / KB)} KiB`;
@@ -39,13 +44,15 @@ function formatSize(bytes) {
 function formatLatency(secs) {
   const nanos = secs * 1e9;
 
-  if (nanos < 0x3e8) {
+  if (nanos < 1_000.0) {
     return `${nanos.toFixed(2)} ns`;
-  } else if (nanos < 0xf4240) {
-    return `${(nanos / 0x3e8).toFixed(2)} µs`;
+  } else if (nanos < 1_000_000.0) {
+    return `${(nanos / 1_000.0).toFixed(2)} µs`;
+  } else if (nanos < 1_000_000_000.0) {
+    return `${(nanos / 1_000_000.0).toFixed(2)} ms`;
   }
 
-  return `${(nanos / 0xf4240).toFixed(2)} ms`;
+  return `${secs.toFixed(2)} s`;
 }
 
 function benchmarkTier(tier, haystack, needle) {
@@ -57,15 +64,15 @@ function benchmarkTier(tier, haystack, needle) {
   let warmupIters = 0;
 
   while (
-    Number(process.hrtime.bigint() - warmupStart) < 0x5f5e100 || // 100ms
-    warmupIters < 0x40
+    (Number(process.hrtime.bigint() - warmupStart) < 0x5f5e100 && warmupIters < 0x40) ||
+    warmupIters < 2
   ) {
     blackHole = searchTwo(slice, needle);
     warmupIters++;
   }
 
   const probeStart = process.hrtime.bigint();
-  const probeIters = Math.max(0x14, Math.floor(warmupIters / 0xa));
+  const probeIters = Math.max(0x0a, Math.floor(warmupIters / 0x0a));
 
   for (let i = 0; i < probeIters; i++) {
     blackHole = searchTwo(slice, needle);
@@ -108,7 +115,7 @@ function printTable(results) {
   const colThrpt = "Throughput";
 
   const wTier = 0x16;
-  const wSize = 0xa;
+  const wSize = 0x0a;
   const wLat = 0x12;
   const wThrpt = 0x10;
 
@@ -130,7 +137,7 @@ function printTable(results) {
 }
 
 function main() {
-  const needle = new Uint8Array([0x0a, 0x0a]);
+  const needle = new Uint8Array([0x0a, 0x0b]);
   const maxSize = Math.max(...TIERS.map((t) => t.size));
 
   const haystack = new Uint8Array(maxSize);
