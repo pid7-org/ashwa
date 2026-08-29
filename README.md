@@ -75,31 +75,35 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 > Benchmarks are evaluated across dedicated AWS EC2 hardware environments,
 >
 > * x86_64 (_x64_)
->   * Instance: Intel(R) Xeon(R) Platinum 8375C @ 2.90GHz (8C/16T)
->   * ISA: _AVX-512BW_ (`+nightly`)
->   * Cache: L1d: 384 KiB · L2: 10 MiB · L3: 54 MiB
->   * STREAM Triad: 20.32 GiB/s
+>   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
+>   * ISA: _AVX512BW_ (`+nightly`)
+>   * Cache: L1d: 384 KiB · L2: 16 MiB · L3: 105 MiB
+>   * STREAM Triad: 25.76 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
 >   * ISA: _NEON_ (stable)
 >   * Cache: L1d: 1 MiB · L2: 16 MiB · L3: 32 MiB
->   * STREAM Triad: 76.50 GiB/s
+>   * STREAM Triad: 75.48 GiB/s
 
 ### `search_one`
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) | ILP (x64) | ILP (arm64) |
 |:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|:----------|:------------|
-| L1 Cache   | 32 KiB    | 211.52 ns     | 667.79 ns       | 144.28 GiB/s     | 45.70 GiB/s        | 1.74      | 0.51        |
-| L2 Cache   | 512 KiB   | 3.32 µs       | 10.82 µs        | 147.03 GiB/s     | 45.14 GiB/s        | 2.53      | 3.23        |
-| L3 Cache   | 16 MiB    | 495.57 µs     | 401.18 µs       | 31.53 GiB/s      | 38.95 GiB/s        | 0.54      | 2.99        |
-| RAM        | 256 MiB   | 20.52 ms      | 9.89 ms         | 12.18 GiB/s      | 25.28 GiB/s        | 0.21      | 2.02        |
+| L1 Cache   | 32 KiB    | 203.82 ns     | 668.40 ns       | 149.73 GiB/s     | 45.66 GiB/s        | 1.41      | 2.03        |
+| L2 Cache   | 512 KiB   | 3.31 µs       | 11.29 µs        | 147.74 GiB/s     | 43.24 GiB/s        | 3.10      | 3.19        |
+| L3 Cache   | 16 MiB    | 465.93 µs     | 461.74 µs       | 33.54 GiB/s      | 33.84 GiB/s        | 0.79      | 3.29        |
+| RAM        | 256 MiB   | 21.44 ms      | 10.87 ms        | 11.66 GiB/s      | 23.00 GiB/s        | 0.28      | 1.97        |
+| RAM        | 512 MiB   | 44.49 ms      | 20.91 ms        | 11.24 GiB/s      | 23.92 GiB/s        | -         | -           |
+| RAM        | 1 GiB     | 89.23 ms      | 40.30 ms        | 11.21 GiB/s      | 24.82 GiB/s        | -         | -           |
 
 ### `search_two`
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) | ILP (x64) | ILP (arm64) |
 |:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|:----------|:------------|
-| L1 Cache   | 32 KiB    | 427.57 ns     | 1.48 µs         | 71.37 GiB/s      | 20.61 GiB/s        | 1.68      | 3.25        |
-| L2 Cache   | 512 KiB   | 6.85 µs       | 23.76 µs        | 71.27 GiB/s      | 20.55 GiB/s        | 1.84      | 4.10        |
-| L3 Cache   | 16 MiB    | 506.58 µs     | 783.73 µs       | 30.84 GiB/s      | 19.94 GiB/s        | 0.82      | 4.06        |
-| RAM        | 256 MiB   | 21.28 ms      | 13.10 ms        | 11.75 GiB/s      | 19.08 GiB/s        | 0.30      | 3.92        |
+| L1 Cache   | 32 KiB    | 388.76 ns     | 1.49 µs         | 78.50 GiB/s      | 20.55 GiB/s        | 1.45      | 1.69        |
+| L2 Cache   | 512 KiB   | 9.32 µs       | 23.99 µs        | 52.41 GiB/s      | 20.35 GiB/s        | 1.68      | 4.09        |
+| L3 Cache   | 16 MiB    | 505.33 µs     | 768.56 µs       | 30.92 GiB/s      | 20.33 GiB/s        | 0.91      | 4.19        |
+| RAM        | 256 MiB   | 19.85 ms      | 13.00 ms        | 12.60 GiB/s      | 19.23 GiB/s        | 0.37      | 3.94        |
+| RAM        | 512 MiB   | 41.67 ms      | 26.09 ms        | 12.00 GiB/s      | 19.16 GiB/s        | -         | -           |
+| RAM        | 1 GiB     | 83.70 ms      | 52.12 ms        | 11.95 GiB/s      | 19.19 GiB/s        | -         | -           |
