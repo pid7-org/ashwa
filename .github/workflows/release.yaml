@@ -496,8 +496,9 @@ jobs:
       - name: Download & verify published ashwa package with pytest
         shell: bash
         run: |
-          for i in {1..6}; do
-            pip install ashwa --no-cache-dir && break || sleep 10
+          VERSION="${GITHUB_REF_NAME#v}"
+          for i in {1..12}; do
+            pip install "ashwa==$VERSION" --no-cache-dir && break || sleep 10
           done
 
           pip install pytest
