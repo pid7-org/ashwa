@@ -137,7 +137,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             arch: x64
             toolchain: nightly
-            rustflags: "-C target-feature=+avx512bw"
+            rustflags: "-C target-cpu=native"
 
           - name: "linux-aarch64"
             os: ubuntu-24.04-arm
@@ -158,7 +158,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             arch: x64
             toolchain: nightly
-            rustflags: "-C target-feature=+avx512bw"
+            rustflags: "-C target-cpu=native"
 
           - name: "windows-aarch64"
             os: windows-11-arm
