@@ -88,22 +88,22 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 
 ### `search_one`
 
-| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) | ILP (x64) | ILP (arm64) |
-|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|:----------|:------------|
-| L1 Cache   | 32 KiB    | 203.82 ns     | 668.40 ns       | 149.73 GiB/s     | 45.66 GiB/s        | 1.41      | 2.03        |
-| L2 Cache   | 512 KiB   | 3.31 µs       | 11.29 µs        | 147.74 GiB/s     | 43.24 GiB/s        | 3.10      | 3.19        |
-| L3 Cache   | 16 MiB    | 465.93 µs     | 461.74 µs       | 33.54 GiB/s      | 33.84 GiB/s        | 0.79      | 3.29        |
-| RAM        | 256 MiB   | 21.44 ms      | 10.87 ms        | 11.66 GiB/s      | 23.00 GiB/s        | 0.28      | 1.97        |
-| RAM        | 512 MiB   | 44.49 ms      | 20.91 ms        | 11.24 GiB/s      | 23.92 GiB/s        | -         | -           |
-| RAM        | 1 GiB     | 89.23 ms      | 40.30 ms        | 11.21 GiB/s      | 24.82 GiB/s        | -         | -           |
+| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
+|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
+| L1 Cache   | 32 KiB    | 203.82 ns     | 668.40 ns       | 149.73 GiB/s     | 45.66 GiB/s        |
+| L2 Cache   | 512 KiB   | 3.31 µs       | 11.29 µs        | 147.74 GiB/s     | 43.24 GiB/s        |
+| L3 Cache   | 16 MiB    | 465.93 µs     | 461.74 µs       | 33.54 GiB/s      | 33.84 GiB/s        |
+| RAM        | 256 MiB   | 21.44 ms      | 10.87 ms        | 11.66 GiB/s      | 23.00 GiB/s        |
+| RAM        | 512 MiB   | 44.49 ms      | 20.91 ms        | 11.24 GiB/s      | 23.92 GiB/s        |
+| RAM        | 1 GiB     | 89.23 ms      | 40.30 ms        | 11.21 GiB/s      | 24.82 GiB/s        |
 
 ### `search_two`
 
-| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) | ILP (x64) | ILP (arm64) |
-|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|:----------|:------------|
-| L1 Cache   | 32 KiB    | 388.76 ns     | 1.49 µs         | 78.50 GiB/s      | 20.55 GiB/s        | 1.45      | 1.69        |
-| L2 Cache   | 512 KiB   | 9.32 µs       | 23.99 µs        | 52.41 GiB/s      | 20.35 GiB/s        | 1.68      | 4.09        |
-| L3 Cache   | 16 MiB    | 505.33 µs     | 768.56 µs       | 30.92 GiB/s      | 20.33 GiB/s        | 0.91      | 4.19        |
-| RAM        | 256 MiB   | 19.85 ms      | 13.00 ms        | 12.60 GiB/s      | 19.23 GiB/s        | 0.37      | 3.94        |
-| RAM        | 512 MiB   | 41.67 ms      | 26.09 ms        | 12.00 GiB/s      | 19.16 GiB/s        | -         | -           |
-| RAM        | 1 GiB     | 83.70 ms      | 52.12 ms        | 11.95 GiB/s      | 19.19 GiB/s        | -         | -           |
+| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
+|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
+| L1 Cache   | 32 KiB    | 388.76 ns     | 1.49 µs         | 78.50 GiB/s      | 20.55 GiB/s        |
+| L2 Cache   | 512 KiB   | 9.32 µs       | 23.99 µs        | 52.41 GiB/s      | 20.35 GiB/s        |
+| L3 Cache   | 16 MiB    | 505.33 µs     | 768.56 µs       | 30.92 GiB/s      | 20.33 GiB/s        |
+| RAM        | 256 MiB   | 19.85 ms      | 13.00 ms        | 12.60 GiB/s      | 19.23 GiB/s        |
+| RAM        | 512 MiB   | 41.67 ms      | 26.09 ms        | 12.00 GiB/s      | 19.16 GiB/s        |
+| RAM        | 1 GiB     | 83.70 ms      | 52.12 ms        | 11.95 GiB/s      | 19.19 GiB/s        |
