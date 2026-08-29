@@ -3,20 +3,23 @@ use std::alloc::{alloc_zeroed, dealloc, Layout};
 use std::hint::black_box;
 use std::time::{Duration, Instant};
 
-const KB: usize = 1024;
+const KB: usize = 0x400;
 const MB: usize = KB * KB;
-const SAMPLES: usize = 512;
+const GB: usize = 0x400 * MB;
+const SAMPLES: usize = 0x200;
 
 struct TierConfig {
     name: &'static str,
     size: usize,
 }
 
-const TIERS: [TierConfig; 4] = [
-    TierConfig { name: "L1 Cache", size: 32 * KB },
-    TierConfig { name: "L2 Cache", size: 512 * KB },
-    TierConfig { name: "L3 Cache", size: 16 * MB },
-    TierConfig { name: "Memory Bound (RAM)", size: 256 * MB },
+const TIERS: [TierConfig; 6] = [
+    TierConfig { name: "L1", size: 0x20 * KB },
+    TierConfig { name: "L2", size: 0x200 * KB },
+    TierConfig { name: "L3", size: 0x10 * MB },
+    TierConfig { name: "RAM", size: 0x100 * MB },
+    TierConfig { name: "RAM", size: 0x200 * MB },
+    TierConfig { name: "RAM", size: 1 * GB },
 ];
 
 struct BenchResult {
@@ -27,7 +30,9 @@ struct BenchResult {
 }
 
 fn format_size(bytes: usize) -> String {
-    if bytes >= MB {
+    if bytes >= GB {
+        format!("{} GiB", bytes / GB)
+    } else if bytes >= MB {
         format!("{} MiB", bytes / MB)
     } else if bytes >= KB {
         format!("{} KiB", bytes / KB)
@@ -43,8 +48,10 @@ fn format_latency(secs: f64) -> String {
         format!("{:.2} ns", nanos)
     } else if nanos < 1_000_000.0 {
         format!("{:.2} µs", nanos / 1_000.0)
-    } else {
+    } else if nanos < 1_000_000_000.0 {
         format!("{:.2} ms", nanos / 1_000_000.0)
+    } else {
+        format!("{:.2} s", secs)
     }
 }
 
@@ -52,17 +59,19 @@ fn benchmark_tier(tier: &TierConfig, haystack: &[u8], needle: u8) -> BenchResult
     let size = tier.size;
     let slice = &haystack[..size];
 
-    // Warmup
+    // warmup
     let warmup_start = Instant::now();
     let mut warmup_iters = 0usize;
 
-    while warmup_start.elapsed() < Duration::from_millis(100) || warmup_iters < 64 {
+    while (warmup_start.elapsed() < Duration::from_millis(0x64) && warmup_iters < 0x40)
+        || warmup_iters < 2
+    {
         black_box(search_one(black_box(slice), black_box(needle)));
         warmup_iters += 1;
     }
 
     let probe_start = Instant::now();
-    let probe_iters = 20.max(warmup_iters / 10);
+    let probe_iters = 0x0A.max(warmup_iters / 0x0A);
 
     for _ in 0..probe_iters {
         black_box(search_one(black_box(slice), black_box(needle)));
@@ -97,10 +106,10 @@ fn print_table(results: &[BenchResult]) {
     let col_lat = "Latency (Median)";
     let col_thrpt = "Throughput";
 
-    let w_tier = 22;
-    let w_size = 10;
-    let w_lat = 18;
-    let w_thrpt = 16;
+    let w_tier = 0x16;
+    let w_size = 0x0A;
+    let w_lat = 0x12;
+    let w_thrpt = 0x10;
 
     let divider = format!(
         "+-{:-<w_tier$}-+-{:-<w_size$}-+-{:-<w_lat$}-+-{:-<w_thrpt$}-+",
@@ -147,16 +156,16 @@ fn print_table(results: &[BenchResult]) {
 
 fn main() {
     let needle = 0x0Au8;
-    let max_size = TIERS.iter().map(|t| t.size).max().unwrap_or(256 * MB);
+    let max_size = TIERS.iter().map(|t| t.size).max().unwrap_or(1 * GB);
 
-    let layout = Layout::from_size_align(max_size, 64).expect("valid layout");
+    let layout = Layout::from_size_align(max_size, 0x40).expect("valid layout");
     let ptr = unsafe { alloc_zeroed(layout) };
 
     if ptr.is_null() {
         panic!("failed to allocate benchmark buffer");
     }
 
-    for page_offset in (0..max_size).step_by(4096) {
+    for page_offset in (0..max_size).step_by(0x1000) {
         unsafe { std::ptr::write_volatile(ptr.add(page_offset), 0) };
     }
 
