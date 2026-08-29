@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.2] - 2026-08-29
+
+- fix `Illegal instruction` crashes on x86_64 CPUs (machines w/o AVX-512BW ISA)
+  - npm: build native addon with `target-cpu=native`
+  - pypi: build wheels with `target-cpu=native`
+- improvements in CI
+  - rust: specify `-p ashwa` explicitly in publish step
+  - npm:
+    - pin package version during verification
+    - run separate node and browser test suites
+  - pypi:
+    - pin package version during verification
+    - add retry backoff for CDN indexing
+
 ## [0.2.1] - 2026-08-29
 
 - Impl of `search_two`, the hardware-accelerated 2-byte substring search
