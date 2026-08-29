@@ -375,8 +375,8 @@ $CARGO_CMD build -q --release -p ashwa --example "$ILP_EXAMPLE" >/dev/null 2>&1
 ILP_BIN="./target/release/examples/${ILP_EXAMPLE}"
 [ ! -f "$ILP_BIN" ] && ILP_BIN="./target/release/${ILP_EXAMPLE}"
 
-TIERS=("l1" "l2" "l3" "ram")
-TIER_LABELS=("L1 Cache (32 KiB)" "L2 Cache (512 KiB)" "L3 Cache (16 MiB)" "RAM (256 MiB)")
+TIERS=("l1" "l2" "l3" "ram" "ram512" "ram1g")
+TIER_LABELS=("L1 Cache (32 KiB)" "L2 Cache (512 KiB)" "L3 Cache (16 MiB)" "RAM (256 MiB)" "RAM (512 MiB)" "RAM (1 GiB)")
 
 declare -A MAP_IPC
 declare -A MAP_GHZ

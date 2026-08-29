@@ -11,6 +11,7 @@ use std::time::Instant;
 
 const KB: usize = 1024;
 const MB: usize = KB * KB;
+const GB: usize = 1024 * MB;
 const ITERATIONS_PER_TIER: usize = 1000;
 
 struct TierConfig {
@@ -19,11 +20,13 @@ struct TierConfig {
     size: usize,
 }
 
-const TIERS: [TierConfig; 4] = [
+const TIERS: [TierConfig; 6] = [
     TierConfig { key: "l1", name: "L1 Cache", size: 32 * KB },
     TierConfig { key: "l2", name: "L2 Cache", size: 512 * KB },
     TierConfig { key: "l3", name: "L3 Cache", size: 16 * MB },
-    TierConfig { key: "ram", name: "Memory Bound (RAM)", size: 256 * MB },
+    TierConfig { key: "ram", name: "Memory Bound (RAM 256 MiB)", size: 256 * MB },
+    TierConfig { key: "ram512", name: "Memory Bound (RAM 512 MiB)", size: 512 * MB },
+    TierConfig { key: "ram1g", name: "Memory Bound (RAM 1 GiB)", size: 1 * GB },
 ];
 
 #[inline(always)]
@@ -141,7 +144,9 @@ fn main() {
         "l1" => run_tier(&TIERS[0], needle),
         "l2" => run_tier(&TIERS[1], needle),
         "l3" => run_tier(&TIERS[2], needle),
-        "ram" | "memory" => run_tier(&TIERS[3], needle),
+        "ram" | "ram256" | "memory" => run_tier(&TIERS[3], needle),
+        "ram512" => run_tier(&TIERS[4], needle),
+        "ram1g" | "ram1gb" | "1g" | "1gb" => run_tier(&TIERS[5], needle),
         _ => {
             for tier in &TIERS {
                 run_tier(tier, needle);
