@@ -13,7 +13,6 @@ Hardware accelerated routines for single substring search
 
 - [Language Ecosystems](#language-ecosystems)
 - [Supported Targets](#supported-targets)
-- [`AVX512` Support](#avx512-support)
 - [Installation](#installation)
 - [API](#api)
 - [Benchmarks](#benchmarks)
@@ -36,23 +35,6 @@ Hardware accelerated routines for single substring search
 | ARMv7           | Linux ARM, Android                           | 128-bit ARM NEON                     | 32-bit SWAR |
 | WebAssembly     | Browsers, Node.js (wasm32)                   | WASM SIMD128 (simd128)               | 32-bit SWAR |
 
-## `AVX512` Support
-
-> [!IMPORTANT]
-> The `AVX512BW` ISA backend requires the **nightly** toolchain and explicit target feature flags passed at
-> compile-time.
->
-> On stable toolchains or when flags are omitted, `ashwa` gracefully falls back to AVX2 / SSE4.2 / SWAR routines
-> with zero overhead.
->
-> ```bash
-> # Build with explicit AVX512BW feature flags
-> RUSTFLAGS="-C target-feature=+avx512bw" cargo +nightly build --release
->
-> # Or enable native host CPU features (including AVX-512 on supported processors)
-> RUSTFLAGS="-C target-cpu=native" cargo +nightly build --release
-> ```
-
 ## Installation
 
 Add `ashwa` to your `Cargo.toml`:
@@ -61,6 +43,12 @@ Add `ashwa` to your `Cargo.toml`:
 [dependencies]
 ashwa = "0.2.3"
 ```
+
+> [!IMPORTANT]
+> Minimum Supported Rust Version (MSRV) is `1.89.0`.
+>
+> `ashwa` needs Rust _1.89.0_ or newer to use stable AVX-512BW support. This allows it to automatically
+> choose the best instructions for each x86_64 processor without needing a nightly Rust version.
 
 ## API
 
@@ -76,13 +64,13 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 >
 > * x86_64 (_x64_)
 >   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
->   * ISA: _AVX512BW_ (`+nightly`)
+>   * ISA: _AVX512BW_
 >   * Cache: L1d: 384 KiB · L2: 16 MiB · L3: 105 MiB
 >   * STREAM Triad: 25.76 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
->   * ISA: _NEON_ (stable)
+>   * ISA: _NEON_
 >   * Cache: L1d: 1 MiB · L2: 16 MiB · L3: 32 MiB
 >   * STREAM Triad: 75.48 GiB/s
 
