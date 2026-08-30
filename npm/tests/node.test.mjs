@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { searchOne, searchTwo, isNative, init, initSync } from "../index.mjs";
+import { searchOne, searchTwo, isNative, init, initSync } from "@pid7/ashwa";
 
 describe("Node Native Backend ESM (index.mjs)", () => {
   test("ESM exports and basic search", async () => {

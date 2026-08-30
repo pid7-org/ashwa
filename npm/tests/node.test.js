@@ -1,6 +1,6 @@
 const { test, describe } = require("node:test");
 const { strictEqual, throws } = require("node:assert/strict");
-const { searchOne, searchTwo, isNative, init, initSync } = require("../index.js");
+const { searchOne, searchTwo, isNative, init, initSync } = require("@pid7/ashwa");
 
 describe("Node Native Backend (napi-rs)", () => {
   test("Environment & exports verification", async () => {

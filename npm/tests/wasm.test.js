@@ -1,6 +1,6 @@
 const { test, describe } = require("node:test");
 const { strictEqual, rejects } = require("node:assert/strict");
-const { searchOne, searchTwo, isNative, init, initSync } = require("../browser.js");
+const { searchOne, searchTwo, isNative, init, initSync } = require("@pid7/ashwa/browser");
 
 describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
   test("Environment & exports verification", async () => {

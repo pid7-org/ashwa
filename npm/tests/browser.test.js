@@ -25,12 +25,13 @@ describe("Headless Browser WASM SIMD128 Execution", () => {
       return;
     }
 
-    const wasmPath = path.join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
+    const packageDir = path.dirname(require.resolve("@pid7/ashwa/package.json"));
+    const wasmPath = path.join(packageDir, "wasm/pkg/ashwa_wasm_bg.wasm");
     const wasmBytes = fs.readFileSync(wasmPath);
     const wasmBase64 = wasmBytes.toString("base64");
 
     const jsCode = fs.readFileSync(
-      path.join(__dirname, "../wasm/pkg/ashwa_wasm.js"),
+      path.join(packageDir, "wasm/pkg/ashwa_wasm.js"),
       "utf8",
     );
 

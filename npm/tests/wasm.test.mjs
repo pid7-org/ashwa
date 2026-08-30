@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { searchOne, searchTwo, isNative, init } from "../browser.mjs";
+import { searchOne, searchTwo, isNative, init } from "@pid7/ashwa/browser";
 
 describe("WebAssembly Backend ESM (browser.mjs)", () => {
   test("ESM exports and basic search", async () => {
