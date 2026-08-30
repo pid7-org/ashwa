@@ -17,11 +17,11 @@ use core::arch::wasm32::*;
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
-#[cfg(target_pointer_width = "64")]
-use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
+#[cfg(any(target_pointer_width = "64", test))]
+use crate::common::search_one_swar64;
 
 #[cfg(any(target_pointer_width = "32", test))]
-use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
+use crate::common::search_one_swar32;
 
 /// Searches for the first occurrence of a single byte needle in a byte slice haystack
 ///
@@ -92,118 +92,6 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
 
         search_one_swar32(haystack, needle)
     }
-}
-
-#[inline(always)]
-#[cfg(target_pointer_width = "64")]
-fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
-    let needle_qword = (needle as u64).wrapping_mul(LSB64);
-
-    let mut i = 0;
-    let len = haystack.len();
-    let ptr = haystack.as_ptr();
-
-    while i + 0x20 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
-        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
-
-        let m1 = match_qword(w1, needle_qword);
-        let m2 = match_qword(w2, needle_qword);
-        let m3 = match_qword(w3, needle_qword);
-        let m4 = match_qword(w4, needle_qword);
-
-        if (m1 | m2 | m3 | m4) != 0 {
-            if m1 != 0 {
-                return Some(i + get_match_index_64(m1));
-            }
-
-            if m2 != 0 {
-                return Some(i + 8 + get_match_index_64(m2));
-            }
-
-            if m3 != 0 {
-                return Some(i + 0x10 + get_match_index_64(m3));
-            }
-
-            return Some(i + 0x18 + get_match_index_64(m4));
-        }
-
-        i += 0x20;
-    }
-
-    if i + 0x10 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-
-        let m1 = match_qword(w1, needle_qword);
-        let m2 = match_qword(w2, needle_qword);
-
-        if (m1 | m2) != 0 {
-            if m1 != 0 {
-                return Some(i + get_match_index_64(m1));
-            }
-
-            return Some(i + 8 + get_match_index_64(m2));
-        }
-
-        i += 0x10;
-    }
-
-    if i + 8 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let m1 = match_qword(w1, needle_qword);
-
-        if m1 != 0 {
-            return Some(i + get_match_index_64(m1));
-        }
-
-        i += 8;
-    }
-
-    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
-}
-
-#[inline(always)]
-#[cfg(any(target_pointer_width = "32", test))]
-fn search_one_swar32(haystack: &[u8], needle: u8) -> Option<usize> {
-    let needle_word = (needle as u32).wrapping_mul(LSB32);
-
-    let mut i = 0;
-    let len = haystack.len();
-    let ptr = haystack.as_ptr();
-
-    while i + 8 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 4) as *const u32) };
-
-        let m1 = match_dword(w1, needle_word);
-        let m2 = match_dword(w2, needle_word);
-
-        if (m1 | m2) != 0 {
-            if m1 != 0 {
-                return Some(i + get_match_index_32(m1));
-            }
-
-            return Some(i + 4 + get_match_index_32(m2));
-        }
-
-        i += 8;
-    }
-
-    if i + 4 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
-        let m1 = match_dword(w1, needle_word);
-
-        if m1 != 0 {
-            return Some(i + get_match_index_32(m1));
-        }
-
-        i += 4;
-    }
-
-    haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
 #[cfg(target_arch = "x86_64")]

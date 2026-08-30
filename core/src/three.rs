@@ -18,10 +18,10 @@ use core::arch::wasm32::*;
 use core::arch::aarch64::*;
 
 #[cfg(any(target_pointer_width = "64", test))]
-use crate::common::{get_match_index_64, match_qword, LSB64, MSB64};
+use crate::common::search_three_swar64;
 
 #[cfg(any(target_pointer_width = "32", test))]
-use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
+use crate::common::search_three_swar32;
 
 /// Searches for the first occurrence of a three-byte needle in a byte slice haystack
 ///
@@ -110,147 +110,6 @@ pub fn search_three(haystack: &[u8], needle: [u8; 0x03]) -> Option<usize> {
     {
         search_three_swar32(haystack, needle)
     }
-}
-
-#[inline(always)]
-#[cfg(any(target_pointer_width = "64", test))]
-fn search_three_swar64(haystack: &[u8], needle: [u8; 0x03]) -> Option<usize> {
-    let needle_a = (needle[0x00] as u64).wrapping_mul(LSB64);
-    let needle_b = (needle[0x01] as u64).wrapping_mul(LSB64);
-    let needle_c = (needle[0x02] as u64).wrapping_mul(LSB64);
-
-    let mut i = 0x00;
-    let len = haystack.len();
-    let ptr = haystack.as_ptr();
-
-    while i + 0x22 <= len {
-        let w1_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w1_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u64) };
-        let w1_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x02) as *const u64) };
-        let w2_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x08) as *const u64) };
-        let w2_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x09) as *const u64) };
-        let w2_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x0A) as *const u64) };
-        let w3_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
-        let w3_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x11) as *const u64) };
-        let w3_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x12) as *const u64) };
-        let w4_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
-        let w4_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x19) as *const u64) };
-        let w4_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x1A) as *const u64) };
-
-        let m1 =
-            match_qword(w1_a, needle_a) & match_qword(w1_b, needle_b) & match_qword(w1_c, needle_c);
-        let m2 =
-            match_qword(w2_a, needle_a) & match_qword(w2_b, needle_b) & match_qword(w2_c, needle_c);
-        let m3 =
-            match_qword(w3_a, needle_a) & match_qword(w3_b, needle_b) & match_qword(w3_c, needle_c);
-        let m4 =
-            match_qword(w4_a, needle_a) & match_qword(w4_b, needle_b) & match_qword(w4_c, needle_c);
-
-        if (m1 | m2 | m3 | m4) != 0x00 {
-            if m1 != 0x00 {
-                return Some(i + get_match_index_64(m1));
-            }
-
-            if m2 != 0x00 {
-                return Some(i + 0x08 + get_match_index_64(m2));
-            }
-
-            if m3 != 0x00 {
-                return Some(i + 0x10 + get_match_index_64(m3));
-            }
-
-            return Some(i + 0x18 + get_match_index_64(m4));
-        }
-
-        i += 0x20;
-    }
-
-    while i + 0x0A <= len {
-        let w_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u64) };
-        let w_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x02) as *const u64) };
-
-        let m =
-            match_qword(w_a, needle_a) & match_qword(w_b, needle_b) & match_qword(w_c, needle_c);
-
-        if m != 0x00 {
-            return Some(i + get_match_index_64(m));
-        }
-
-        i += 0x08;
-    }
-
-    haystack[i..].windows(0x03).position(|w| w == needle).map(|pos| pos + i)
-}
-
-#[inline(always)]
-#[cfg(any(target_pointer_width = "32", test))]
-fn search_three_swar32(haystack: &[u8], needle: [u8; 0x03]) -> Option<usize> {
-    let needle_a = (needle[0x00] as u32).wrapping_mul(LSB32);
-    let needle_b = (needle[0x01] as u32).wrapping_mul(LSB32);
-    let needle_c = (needle[0x02] as u32).wrapping_mul(LSB32);
-
-    let len = haystack.len();
-    let ptr = haystack.as_ptr();
-
-    let mut i = 0x00;
-    while i + 0x12 <= len {
-        let w1_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
-        let w1_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u32) };
-        let w1_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x02) as *const u32) };
-        let w2_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x04) as *const u32) };
-        let w2_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x05) as *const u32) };
-        let w2_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x06) as *const u32) };
-        let w3_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x08) as *const u32) };
-        let w3_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x09) as *const u32) };
-        let w3_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x0A) as *const u32) };
-        let w4_a = unsafe { ptr::read_unaligned(ptr.add(i + 0x0C) as *const u32) };
-        let w4_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x0D) as *const u32) };
-        let w4_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x0E) as *const u32) };
-
-        let m1 =
-            match_dword(w1_a, needle_a) & match_dword(w1_b, needle_b) & match_dword(w1_c, needle_c);
-        let m2 =
-            match_dword(w2_a, needle_a) & match_dword(w2_b, needle_b) & match_dword(w2_c, needle_c);
-        let m3 =
-            match_dword(w3_a, needle_a) & match_dword(w3_b, needle_b) & match_dword(w3_c, needle_c);
-        let m4 =
-            match_dword(w4_a, needle_a) & match_dword(w4_b, needle_b) & match_dword(w4_c, needle_c);
-
-        if (m1 | m2 | m3 | m4) != 0x00 {
-            if m1 != 0x00 {
-                return Some(i + get_match_index_32(m1));
-            }
-
-            if m2 != 0x00 {
-                return Some(i + 0x04 + get_match_index_32(m2));
-            }
-
-            if m3 != 0x00 {
-                return Some(i + 0x08 + get_match_index_32(m3));
-            }
-
-            return Some(i + 0x0C + get_match_index_32(m4));
-        }
-
-        i += 0x10;
-    }
-
-    while i + 0x06 <= len {
-        let w_a = unsafe { ptr::read_unaligned(ptr.add(i) as *const u32) };
-        let w_b = unsafe { ptr::read_unaligned(ptr.add(i + 0x01) as *const u32) };
-        let w_c = unsafe { ptr::read_unaligned(ptr.add(i + 0x02) as *const u32) };
-
-        let m =
-            match_dword(w_a, needle_a) & match_dword(w_b, needle_b) & match_dword(w_c, needle_c);
-        if m != 0x00 {
-            return Some(i + get_match_index_32(m));
-        }
-
-        i += 0x04;
-    }
-
-    haystack[i..].windows(0x03).position(|w| w == needle).map(|pos| pos + i)
 }
 
 #[target_feature(enable = "sse2")]
