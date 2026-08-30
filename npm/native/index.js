@@ -701,4 +701,5 @@ if (!nativeBinding) {
 
 module.exports = nativeBinding
 module.exports.searchOne = nativeBinding.searchOne
+module.exports.searchThree = nativeBinding.searchThree
 module.exports.searchTwo = nativeBinding.searchTwo

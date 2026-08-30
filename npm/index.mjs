@@ -53,3 +53,21 @@ export function searchTwo(haystack, needle) {
   const res = native.searchTwo(haystack, n);
   return res !== undefined && res !== null ? Number(res) : null;
 }
+
+/**
+ * Searches for the first occurrence of a three-byte `needle` in `haystack`.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {Uint8Array|number[]} needle - 3-byte sequence to locate.
+ * @returns {number|null} 0-based index or null if not found.
+ */
+export function searchThree(haystack, needle) {
+  const n = Array.isArray(needle) ? new Uint8Array(needle) : needle;
+  if (n == null || n.length !== 3) {
+    throw new TypeError("needle must be a 3-byte sequence");
+  }
+
+  const res = native.searchThree(haystack, n);
+  return res !== undefined && res !== null ? Number(res) : null;
+}
+

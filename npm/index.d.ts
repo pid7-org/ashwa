@@ -56,6 +56,33 @@ export function searchTwo(
 ): number | null | Promise<number | null>;
 
 /**
+ * Searches for the first occurrence of a three-byte `needle` within `haystack` (Uint8Array / Buffer).
+ *
+ * Execution backend:
+ * - **Node.js / Bun / Deno**: Executes synchronously via N-API native bindings with SIMD vectorization (AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON).
+ * - **Browser / WebWorker**: Executes via WebAssembly SIMD (`simd128`), automatically initializing the WASM module on first invocation if not already loaded.
+ *
+ * @param haystack - The byte array/buffer to search.
+ * @param needle - A 3-byte sequence (`Uint8Array`, `Buffer`, or `[number, number, number]` / `number[]`) to locate.
+ * @returns The 0-based byte index of the first occurrence of `needle`, or `null` if not found.
+ *
+ * @example
+ * ```javascript
+ * import { searchThree } from '@pid7/ashwa';
+ *
+ * const haystack = new TextEncoder().encode("Hello, World!");
+ * const needle = new TextEncoder().encode("Wor");
+ * const index = await searchThree(haystack, needle);
+ * console.log(index); // 7
+ * ```
+ */
+export function searchThree(
+  haystack: Uint8Array,
+  needle: Uint8Array | [number, number, number] | number[],
+): number | null | Promise<number | null>;
+
+
+/**
  * Asynchronously pre-initializes the WebAssembly module backend (Browser / WebWorker).
  *
  * In Node.js native mode (`isNative === true`), this is a no-op that resolves immediately.

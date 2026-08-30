@@ -14,6 +14,19 @@
 export declare function searchOne(haystack: Uint8Array, needle: number): number | null
 
 /**
+ * Searches for the first occurrence of a three-byte `needle` in `haystack`.
+ *
+ * # Arguments
+ * * `haystack` - A byte slice (`&[u8]`) to search within.
+ * * `needle` - A 3-byte slice (`&[u8]`) to locate.
+ *
+ * # Returns
+ * * `Some(index)` - The 0-based byte index of the first match.
+ * * `None` - If `needle` is not found.
+ */
+export declare function searchThree(haystack: Uint8Array, needle: Uint8Array): number | null
+
+/**
  * Searches for the first occurrence of a two-byte `needle` in `haystack`.
  *
  * # Arguments
