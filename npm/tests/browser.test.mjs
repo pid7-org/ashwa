@@ -1,8 +1,11 @@
-const { test, describe } = require("node:test");
-const assert = require("node:assert/strict");
-const path = require("node:path");
-const fs = require("node:fs");
-const { chromium } = require("playwright");
+import { test, describe } from "node:test";
+import assert from "node:assert/strict";
+import path from "node:path";
+import fs from "node:fs";
+import { createRequire } from "node:module";
+import { chromium } from "playwright";
+
+const require = createRequire(import.meta.url);
 
 describe("Headless Browser WASM SIMD128 Execution", () => {
   let browser;
