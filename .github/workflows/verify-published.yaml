@@ -126,7 +126,7 @@ jobs:
 
           npm install playwright
           npx playwright install --with-deps chromium
-          node --test ../npm/tests/wasm.test.js ../npm/tests/wasm.test.mjs ../npm/tests/browser.test.js
+          node --test ../npm/tests/wasm.test.js ../npm/tests/wasm.test.mjs ../npm/tests/browser.test.mjs
 
   test-pypi:
     name: test-pypi (${{ matrix.name }})
