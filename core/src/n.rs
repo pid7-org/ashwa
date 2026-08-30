@@ -1,10 +1,23 @@
 #![allow(unused)]
 
+use core::ptr;
+
+#[cfg(target_arch = "aarch64")]
+use core::arch::aarch64::*;
+
+#[cfg(all(target_arch = "arm", target_feature = "neon"))]
+use core::arch::arm::*;
+
 #[cfg(any(target_pointer_width = "64", test))]
 use crate::common::search_n_swar64;
 
 #[cfg(any(target_pointer_width = "32", test))]
 use crate::common::search_n_swar32;
+
+#[cfg(any(target_arch = "aarch64", all(target_arch = "arm", target_feature = "neon")))]
+use crate::common::clear_lowest_match_64;
+#[cfg(any(target_arch = "aarch64", all(target_arch = "arm", target_feature = "neon")))]
+use crate::{search_one, search_three, search_two};
 
 /// Searches for the first occurrence of a needle in a byte slice haystack
 ///
@@ -21,7 +34,18 @@ use crate::common::search_n_swar32;
 #[inline(always)]
 #[cfg(target_pointer_width = "64")]
 pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    search_n_swar64(haystack, needle)
+    #[cfg(target_arch = "aarch64")]
+    {
+        #[cfg(forced_swar_backend)]
+        return search_n_swar64(haystack, needle);
+
+        unsafe { search_n_neon(haystack, needle) }
+    }
+
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        search_n_swar64(haystack, needle)
+    }
 }
 
 /// Searches for the first occurrence of a needle in a byte slice haystack
@@ -39,7 +63,340 @@ pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[inline(always)]
 #[cfg(target_pointer_width = "32")]
 pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    search_n_swar32(haystack, needle)
+    #[cfg(target_arch = "arm")]
+    {
+        #[cfg(target_feature = "neon")]
+        return unsafe { search_n_neon(haystack, needle) };
+
+        search_n_swar32(haystack, needle)
+    }
+
+    #[cfg(not(target_arch = "arm"))]
+    {
+        search_n_swar32(haystack, needle)
+    }
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+unsafe fn search_n_neon(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    #[inline(always)]
+    unsafe fn has_match(v: uint8x16_t) -> bool {
+        let u = vreinterpretq_u64_u8(v);
+        (vgetq_lane_u64(u, 0) | vgetq_lane_u64(u, 1)) != 0
+    }
+
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = vdupq_n_u8(needle[0]);
+    let v_needle_b = vdupq_n_u8(needle[1]);
+    let v_needle_c = vdupq_n_u8(needle[n - 1]);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1_a = vld1q_u8(ptr.add(i));
+        let v1_b = vld1q_u8(ptr.add(i + 1));
+        let v1_c = vld1q_u8(ptr.add(i + n - 1));
+
+        let v2_a = vld1q_u8(ptr.add(i + 0x10));
+        let v2_b = vld1q_u8(ptr.add(i + 0x11));
+        let v2_c = vld1q_u8(ptr.add(i + 0x10 + n - 1));
+
+        let v3_a = vld1q_u8(ptr.add(i + 0x20));
+        let v3_b = vld1q_u8(ptr.add(i + 0x21));
+        let v3_c = vld1q_u8(ptr.add(i + 0x20 + n - 1));
+
+        let v4_a = vld1q_u8(ptr.add(i + 0x30));
+        let v4_b = vld1q_u8(ptr.add(i + 0x31));
+        let v4_c = vld1q_u8(ptr.add(i + 0x30 + n - 1));
+
+        let eq1 = vandq_u8(
+            vandq_u8(vceqq_u8(v1_a, v_needle_a), vceqq_u8(v1_b, v_needle_b)),
+            vceqq_u8(v1_c, v_needle_c),
+        );
+        let eq2 = vandq_u8(
+            vandq_u8(vceqq_u8(v2_a, v_needle_a), vceqq_u8(v2_b, v_needle_b)),
+            vceqq_u8(v2_c, v_needle_c),
+        );
+        let eq3 = vandq_u8(
+            vandq_u8(vceqq_u8(v3_a, v_needle_a), vceqq_u8(v3_b, v_needle_b)),
+            vceqq_u8(v3_c, v_needle_c),
+        );
+        let eq4 = vandq_u8(
+            vandq_u8(vceqq_u8(v4_a, v_needle_a), vceqq_u8(v4_b, v_needle_b)),
+            vceqq_u8(v4_c, v_needle_c),
+        );
+
+        let or01 = vorrq_u8(eq1, eq2);
+        let or23 = vorrq_u8(eq3, eq4);
+        let or_all = vorrq_u8(or01, or23);
+
+        if has_match(or_all) {
+            if has_match(eq1) {
+                if let Some(pos) = verify_candidates_neon(haystack, needle, i, eq1) {
+                    return Some(pos);
+                }
+            }
+
+            if has_match(eq2) {
+                if let Some(pos) = verify_candidates_neon(haystack, needle, i + 0x10, eq2) {
+                    return Some(pos);
+                }
+            }
+
+            if has_match(eq3) {
+                if let Some(pos) = verify_candidates_neon(haystack, needle, i + 0x20, eq3) {
+                    return Some(pos);
+                }
+            }
+
+            if has_match(eq4) {
+                if let Some(pos) = verify_candidates_neon(haystack, needle, i + 0x30, eq4) {
+                    return Some(pos);
+                }
+            }
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 + n - 1 <= len {
+        let v_a = vld1q_u8(ptr.add(i));
+        let v_b = vld1q_u8(ptr.add(i + 1));
+        let v_c = vld1q_u8(ptr.add(i + n - 1));
+
+        let eq = vandq_u8(
+            vandq_u8(vceqq_u8(v_a, v_needle_a), vceqq_u8(v_b, v_needle_b)),
+            vceqq_u8(v_c, v_needle_c),
+        );
+
+        if has_match(eq) {
+            if let Some(pos) = verify_candidates_neon(haystack, needle, i, eq) {
+                return Some(pos);
+            }
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+unsafe fn verify_candidates_neon(
+    haystack: &[u8],
+    needle: &[u8],
+    base_idx: usize,
+    eq: uint8x16_t,
+) -> Option<usize> {
+    let n = needle.len();
+    let eq_u64 = vreinterpretq_u64_u8(eq);
+    let mut lane0 = vgetq_lane_u64(eq_u64, 0);
+
+    while lane0 != 0 {
+        let offset = (lane0.trailing_zeros() / 8) as usize;
+        let cand = base_idx + offset;
+        if &haystack[cand..cand + n] == needle {
+            return Some(cand);
+        }
+        clear_lowest_match_64(&mut lane0);
+    }
+
+    let mut lane1 = vgetq_lane_u64(eq_u64, 1);
+    while lane1 != 0 {
+        let offset = 8 + (lane1.trailing_zeros() / 8) as usize;
+        let cand = base_idx + offset;
+        if &haystack[cand..cand + n] == needle {
+            return Some(cand);
+        }
+        clear_lowest_match_64(&mut lane1);
+    }
+
+    None
+}
+
+#[target_feature(enable = "neon")]
+#[cfg(all(target_arch = "arm", target_feature = "neon", target_pointer_width = "32"))]
+unsafe fn search_n_neon(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    #[inline(always)]
+    unsafe fn any_match(v: uint8x16_t) -> bool {
+        let lanes = vreinterpretq_u64_u8(v);
+        (vgetq_lane_u64(lanes, 0) | vgetq_lane_u64(lanes, 1)) != 0
+    }
+
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = vdupq_n_u8(needle[0]);
+    let v_needle_b = vdupq_n_u8(needle[1]);
+    let v_needle_c = vdupq_n_u8(needle[n - 1]);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1_a = vld1q_u8(ptr.add(i));
+        let v1_b = vld1q_u8(ptr.add(i + 1));
+        let v1_c = vld1q_u8(ptr.add(i + n - 1));
+
+        let v2_a = vld1q_u8(ptr.add(i + 0x10));
+        let v2_b = vld1q_u8(ptr.add(i + 0x11));
+        let v2_c = vld1q_u8(ptr.add(i + 0x10 + n - 1));
+
+        let v3_a = vld1q_u8(ptr.add(i + 0x20));
+        let v3_b = vld1q_u8(ptr.add(i + 0x21));
+        let v3_c = vld1q_u8(ptr.add(i + 0x20 + n - 1));
+
+        let v4_a = vld1q_u8(ptr.add(i + 0x30));
+        let v4_b = vld1q_u8(ptr.add(i + 0x31));
+        let v4_c = vld1q_u8(ptr.add(i + 0x30 + n - 1));
+
+        let eq1 = vandq_u8(
+            vandq_u8(vceqq_u8(v1_a, v_needle_a), vceqq_u8(v1_b, v_needle_b)),
+            vceqq_u8(v1_c, v_needle_c),
+        );
+        let eq2 = vandq_u8(
+            vandq_u8(vceqq_u8(v2_a, v_needle_a), vceqq_u8(v2_b, v_needle_b)),
+            vceqq_u8(v2_c, v_needle_c),
+        );
+        let eq3 = vandq_u8(
+            vandq_u8(vceqq_u8(v3_a, v_needle_a), vceqq_u8(v3_b, v_needle_b)),
+            vceqq_u8(v3_c, v_needle_c),
+        );
+        let eq4 = vandq_u8(
+            vandq_u8(vceqq_u8(v4_a, v_needle_a), vceqq_u8(v4_b, v_needle_b)),
+            vceqq_u8(v4_c, v_needle_c),
+        );
+
+        let or01 = vorrq_u8(eq1, eq2);
+        let or23 = vorrq_u8(eq3, eq4);
+        let or_all = vorrq_u8(or01, or23);
+
+        if any_match(or_all) {
+            if any_match(eq1) {
+                if let Some(pos) = verify_candidates_neon_arm32(haystack, needle, i, eq1) {
+                    return Some(pos);
+                }
+            }
+
+            if any_match(eq2) {
+                if let Some(pos) = verify_candidates_neon_arm32(haystack, needle, i + 0x10, eq2) {
+                    return Some(pos);
+                }
+            }
+
+            if any_match(eq3) {
+                if let Some(pos) = verify_candidates_neon_arm32(haystack, needle, i + 0x20, eq3) {
+                    return Some(pos);
+                }
+            }
+
+            if any_match(eq4) {
+                if let Some(pos) = verify_candidates_neon_arm32(haystack, needle, i + 0x30, eq4) {
+                    return Some(pos);
+                }
+            }
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 + n - 1 <= len {
+        let v_a = vld1q_u8(ptr.add(i));
+        let v_b = vld1q_u8(ptr.add(i + 1));
+        let v_c = vld1q_u8(ptr.add(i + n - 1));
+
+        let eq = vandq_u8(
+            vandq_u8(vceqq_u8(v_a, v_needle_a), vceqq_u8(v_b, v_needle_b)),
+            vceqq_u8(v_c, v_needle_c),
+        );
+
+        if any_match(eq) {
+            if let Some(pos) = verify_candidates_neon_arm32(haystack, needle, i, eq) {
+                return Some(pos);
+            }
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
+#[inline(always)]
+#[cfg(all(target_arch = "arm", target_feature = "neon"))]
+unsafe fn verify_candidates_neon_arm32(
+    haystack: &[u8],
+    needle: &[u8],
+    base_idx: usize,
+    eq: uint8x16_t,
+) -> Option<usize> {
+    let n = needle.len();
+    let eq_u64 = vreinterpretq_u64_u8(eq);
+    let mut lane0 = vgetq_lane_u64(eq_u64, 0);
+
+    while lane0 != 0 {
+        let offset = (lane0.trailing_zeros() / 8) as usize;
+        let cand = base_idx + offset;
+        if &haystack[cand..cand + n] == needle {
+            return Some(cand);
+        }
+        clear_lowest_match_64(&mut lane0);
+    }
+
+    let mut lane1 = vgetq_lane_u64(eq_u64, 1);
+    while lane1 != 0 {
+        let offset = 8 + (lane1.trailing_zeros() / 8) as usize;
+        let cand = base_idx + offset;
+        if &haystack[cand..cand + n] == needle {
+            return Some(cand);
+        }
+        clear_lowest_match_64(&mut lane1);
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -218,7 +575,8 @@ mod tests {
             rng
         };
 
-        let search_fns: [fn(&[u8], &[u8]) -> Option<usize>; 2] = [search_n_swar64, search_n_swar32];
+        type SearchFn = fn(&[u8], &[u8]) -> Option<usize>;
+        let search_fns: [SearchFn; 2] = [search_n_swar64, search_n_swar32];
 
         for s_fn in search_fns {
             for _ in 0..0x3E8 {
@@ -264,5 +622,17 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn test_neon_aarch64_directly() {
+        run_standard_suite(|h, n| unsafe { search_n_neon(h, n) });
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "arm", target_feature = "neon"))]
+    fn test_neon_arm32_directly() {
+        run_standard_suite(|h, n| unsafe { search_n_neon(h, n) });
     }
 }
