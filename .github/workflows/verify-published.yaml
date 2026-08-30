@@ -1,0 +1,791 @@
+name: Verify Published Packages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  resolve-version:
+    name: resolve-version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      tag: ${{ steps.get-version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Extract most recent tag
+        id: get-version
+        run: |
+          LATEST_TAG=$(git tag --sort=-v:refname | grep '^v[0-9]' | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "Error: Failed to find any release version tag matching pattern 'v*.*.*'"
+            exit 1
+          fi
+          VERSION="${LATEST_TAG#v}"
+          echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved most recent tag: $LATEST_TAG (version: $VERSION)"
+
+  test-npm-node:
+    name: test-npm-node (${{ matrix.name }})
+    needs: resolve-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "linux-x86_64"
+            os: ubuntu-latest
+            arch: x64
+
+          - name: "linux-aarch64"
+            os: ubuntu-24.04-arm
+            arch: arm64
+
+          - name: "macos-aarch64"
+            os: macos-latest
+            arch: arm64
+
+          - name: "windows-x86_64"
+            os: windows-latest
+            arch: x64
+
+          - name: "windows-aarch64"
+            os: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.arch }}
+
+      - name: Download & verify published @pid7/ashwa package (Node.js Native)
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          mkdir -p test-published-package
+          cd test-published-package
+          npm init -y
+
+          installed=false
+          for i in {1..30}; do
+            if npm install "@pid7/ashwa@$VERSION" --prefer-online; then
+              installed=true
+              break
+            fi
+            echo "Waiting for @pid7/ashwa@$VERSION on npm registry (attempt $i/30)..."
+            sleep 10
+          done
+
+          if [ "$installed" = false ]; then
+            echo "Failed to install @pid7/ashwa@$VERSION from npm registry after 30 attempts."
+            exit 1
+          fi
+
+          cat << 'EOF' > test.js
+          const { test, describe } = require("node:test");
+          const { strictEqual, throws } = require("node:assert/strict");
+          const { searchOne, searchTwo, isNative, init, initSync } = require("@pid7/ashwa");
+
+          describe("Node Native Published Package", () => {
+            test("Environment & exports verification", async () => {
+              strictEqual(isNative, true);
+              strictEqual(typeof searchOne, "function");
+              strictEqual(typeof searchTwo, "function");
+              strictEqual(typeof init, "function");
+              strictEqual(typeof initSync, "function");
+              await init();
+              initSync();
+            });
+
+            test("Basic searchOne operations", () => {
+              const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+              strictEqual(searchOne(haystack, "a".charCodeAt(0)), 0);
+              strictEqual(searchOne(haystack, "m".charCodeAt(0)), 12);
+              strictEqual(searchOne(haystack, "z".charCodeAt(0)), 25);
+              strictEqual(searchOne(haystack, "A".charCodeAt(0)), null);
+            });
+
+            test("Basic searchTwo operations", () => {
+              const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+              strictEqual(searchTwo(haystack, Buffer.from("ab")), 0);
+              strictEqual(searchTwo(haystack, Buffer.from("mn")), 12);
+              strictEqual(searchTwo(haystack, Buffer.from("yz")), 24);
+              strictEqual(searchTwo(haystack, Buffer.from("AB")), null);
+              strictEqual(searchTwo(haystack, [0x61, 0x62]), 0);
+            });
+
+            test("Pangram spot-checks for searchTwo", () => {
+              const haystack = Buffer.from("the quick brown fox jumps over the lazy dog");
+              strictEqual(searchTwo(haystack, Buffer.from("th")), 0);
+              strictEqual(searchTwo(haystack, Buffer.from("he")), 1);
+              strictEqual(searchTwo(haystack, Buffer.from("qu")), 4);
+              strictEqual(searchTwo(haystack, Buffer.from("ox")), 17);
+              strictEqual(searchTwo(haystack, Buffer.from("do")), 40);
+              strictEqual(searchTwo(haystack, Buffer.from("og")), 41);
+              strictEqual(searchTwo(haystack, Buffer.from("ZZ")), null);
+              strictEqual(searchTwo(haystack, Buffer.from("!!")), null);
+            });
+
+            test("Empty buffer search", () => {
+              strictEqual(searchOne(new Uint8Array(0), 65), null);
+              strictEqual(searchOne(Buffer.alloc(0), 65), null);
+              strictEqual(searchTwo(new Uint8Array(0), Buffer.from("ab")), null);
+              strictEqual(searchTwo(Buffer.alloc(0), Buffer.from("ab")), null);
+              strictEqual(searchTwo(Buffer.from("a"), Buffer.from("ab")), null);
+            });
+
+            test("Multiple occurrences return first match", () => {
+              const haystack = Buffer.from("banana");
+              strictEqual(searchOne(haystack, "a".charCodeAt(0)), 1);
+              strictEqual(searchOne(haystack, "n".charCodeAt(0)), 2);
+              strictEqual(searchTwo(haystack, Buffer.from("an")), 1);
+              strictEqual(searchTwo(haystack, Buffer.from("na")), 2);
+            });
+
+            test("Binary data & extreme byte values (0x00 and 0xFF)", () => {
+              const data = new Uint8Array([0x10, 0x20, 0x00, 0x30, 0xff, 0x40]);
+              strictEqual(searchOne(data, 0x00), 2);
+              strictEqual(searchOne(data, 0xff), 4);
+              strictEqual(searchOne(data, 0x99), null);
+
+              const binaryData = new Uint8Array([0x10, 0x00, 0x00, 0x30, 0xfe, 0xff, 0x40]);
+              strictEqual(searchTwo(binaryData, new Uint8Array([0x00, 0x00])), 1);
+              strictEqual(searchTwo(binaryData, new Uint8Array([0xfe, 0xff])), 4);
+              strictEqual(searchTwo(binaryData, new Uint8Array([0xff, 0xff])), null);
+            });
+
+            test("Overlapping & repeating patterns", () => {
+              strictEqual(searchTwo(Buffer.from("aaaaaa"), Buffer.from("aa")), 0);
+              strictEqual(searchTwo(Buffer.from("baaaaa"), Buffer.from("aa")), 1);
+              strictEqual(searchTwo(Buffer.from("bbaaaa"), Buffer.from("aa")), 2);
+              strictEqual(searchTwo(Buffer.from("ababab"), Buffer.from("ab")), 0);
+              strictEqual(searchTwo(Buffer.from("bababa"), Buffer.from("ab")), 1);
+
+              const allA = Buffer.alloc(256, "A");
+              strictEqual(searchTwo(allA, Buffer.from("AB")), null);
+              allA[120] = "B".charCodeAt(0);
+              strictEqual(searchTwo(allA, Buffer.from("AB")), 119);
+            });
+
+            test("Buffer types compatibility (Buffer vs Uint8Array vs Subarray)", () => {
+              const rawArray = [10, 20, 30, 40, 50, 60, 70, 80];
+              const uint8 = new Uint8Array(rawArray);
+              const nodeBuf = Buffer.from(rawArray);
+              const subarray = uint8.subarray(2, 6);
+
+              strictEqual(searchOne(uint8, 50), 4);
+              strictEqual(searchOne(nodeBuf, 50), 4);
+              strictEqual(searchOne(subarray, 50), 2);
+
+              strictEqual(searchTwo(uint8, new Uint8Array([50, 60])), 4);
+              strictEqual(searchTwo(nodeBuf, Buffer.from([50, 60])), 4);
+              strictEqual(searchTwo(subarray, [50, 60]), 2);
+            });
+
+            test("Unaligned byteOffset subarray searches", () => {
+              const memory = new ArrayBuffer(128);
+              const view = new Uint8Array(memory, 7, 50);
+              view.fill(0x55);
+              view[19] = 0xaa;
+              view[20] = 0xbb;
+
+              strictEqual(searchOne(view, 0xaa), 19);
+              strictEqual(searchTwo(view, new Uint8Array([0xaa, 0xbb])), 19);
+            });
+
+            test("SIMD boundary & chunk sizes", () => {
+              const sizes = [
+                1, 2, 3, 7, 8, 9, 15, 16, 17, 24, 25, 31, 32, 33, 34, 63, 64, 65, 127,
+                128, 255, 256,
+              ];
+
+              for (const size of sizes) {
+                const buf = new Uint8Array(size);
+                buf.fill(0xaa);
+
+                buf[0] = 0xbb;
+                strictEqual(searchOne(buf, 0xbb), 0);
+
+                buf[0] = 0xaa;
+                buf[size - 1] = 0xbb;
+                strictEqual(searchOne(buf, 0xbb), size - 1);
+
+                if (size > 2) {
+                  const mid = Math.floor(size / 2);
+                  buf[size - 1] = 0xaa;
+                  buf[mid] = 0xbb;
+                  strictEqual(searchOne(buf, 0xbb), mid);
+                }
+              }
+
+              for (const size of sizes.filter((s) => s >= 2)) {
+                const buf = new Uint8Array(size);
+                buf.fill(0xaa);
+
+                buf[0] = 0xbb;
+                buf[1] = 0xcc;
+                strictEqual(searchTwo(buf, [0xbb, 0xcc]), 0);
+
+                buf[0] = 0xaa;
+                buf[1] = 0xaa;
+                buf[size - 2] = 0xbb;
+                buf[size - 1] = 0xcc;
+                strictEqual(searchTwo(buf, [0xbb, 0xcc]), size - 2);
+
+                if (size > 3) {
+                  const mid = Math.floor(size / 2);
+                  buf[size - 2] = 0xaa;
+                  buf[size - 1] = 0xaa;
+                  buf[mid] = 0xbb;
+                  buf[mid + 1] = 0xcc;
+                  strictEqual(searchTwo(buf, [0xbb, 0xcc]), mid);
+                }
+              }
+            });
+
+            test("Straddling chunk boundaries for searchTwo", () => {
+              const crossPositions = [
+                0x03, 0x04, 0x07, 0x08, 0x0b, 0x0c, 0x0f, 0x10, 0x13, 0x14, 0x17, 0x18,
+                0x1b, 0x1c, 0x1f, 0x20, 0x27, 0x28, 0x3f, 0x40,
+              ];
+              const crossBuf = Buffer.alloc(0x80, "-");
+              for (const pos of crossPositions) {
+                crossBuf[pos] = "Y".charCodeAt(0);
+                crossBuf[pos + 1] = "Z".charCodeAt(0);
+                strictEqual(searchTwo(crossBuf, Buffer.from("YZ")), pos);
+                crossBuf[pos] = "-".charCodeAt(0);
+                crossBuf[pos + 1] = "-".charCodeAt(0);
+              }
+            });
+
+            test("Large payload search (1MB payload)", () => {
+              const size = 1024 * 1024;
+              const buf = new Uint8Array(size);
+              buf.fill(0x41);
+
+              const targetIndices = [0, 15, 16, 31, 32, 63, 64, 5000, 50000, size - 2];
+              for (const idx of targetIndices) {
+                buf[idx] = 0x42;
+                strictEqual(searchOne(buf, 0x42), idx);
+                buf[idx + 1] = 0x43;
+                strictEqual(searchTwo(buf, [0x42, 0x43]), idx);
+                buf[idx] = 0x41;
+                buf[idx + 1] = 0x41;
+              }
+            });
+
+            test("Randomized data correctness test", () => {
+              const size = 4096;
+              const buf = new Uint8Array(size);
+              for (let i = 0; i < size; i++) {
+                buf[i] = (i * 31 + 7) % 255;
+              }
+
+              const testPositions = [
+                0, 1, 15, 16, 30, 31, 32, 63, 64, 100, 511, 1023, 2047, 4094,
+              ];
+              for (const pos of testPositions) {
+                buf[pos] = 255;
+                strictEqual(searchOne(buf, 255), pos);
+                buf[pos + 1] = 254;
+                strictEqual(searchTwo(buf, [255, 254]), pos);
+                buf[pos] = (pos * 31 + 7) % 255;
+                buf[pos + 1] = ((pos + 1) * 31 + 7) % 255;
+              }
+            });
+
+            test("Argument validation and type handling", () => {
+              throws(() => searchOne(null, 65));
+              throws(() => searchOne(undefined, 65));
+              throws(() => searchOne("not_a_buffer", 65));
+              throws(() => searchOne(new Uint8ClampedArray([10, 20]), 20));
+
+              throws(() => searchTwo(null, [65, 66]));
+              throws(() => searchTwo(undefined, [65, 66]));
+              throws(() => searchTwo("not_a_buffer", [65, 66]));
+              throws(() => searchTwo(new Uint8Array([10, 20]), null));
+              throws(() => searchTwo(new Uint8Array([10, 20]), undefined));
+              throws(() => searchTwo(new Uint8Array([10, 20]), []));
+              throws(() => searchTwo(new Uint8Array([10, 20]), [65]));
+              throws(() => searchTwo(new Uint8Array([10, 20]), [65, 66, 67]));
+              throws(() => searchTwo(new Uint8Array([10, 20]), new Uint8Array([65])));
+              throws(() =>
+                searchTwo(new Uint8Array([10, 20]), new Uint8Array([65, 66, 67])),
+              );
+            });
+          });
+          EOF
+
+          cat << 'EOF' > test.mjs
+          import { test, describe } from "node:test";
+          import assert from "node:assert/strict";
+          import { searchOne, searchTwo, isNative, init, initSync } from "@pid7/ashwa";
+
+          describe("Node Native Published Package ESM", () => {
+            test("ESM exports and basic search", async () => {
+              assert.strictEqual(isNative, true);
+              assert.strictEqual(typeof searchOne, "function");
+              assert.strictEqual(typeof searchTwo, "function");
+
+              await init();
+              initSync();
+
+              const buf = Buffer.from("ESM Node test suite");
+              assert.strictEqual(searchOne(buf, "N".charCodeAt(0)), 4);
+              assert.strictEqual(searchOne(buf, "Z".charCodeAt(0)), null);
+
+              assert.strictEqual(searchTwo(buf, Buffer.from("No")), 4);
+              assert.strictEqual(searchTwo(buf, [0x4e, 0x6f]), 4);
+              assert.strictEqual(searchTwo(buf, Buffer.from("ZZ")), null);
+            });
+          });
+          EOF
+
+          node --test test.js test.mjs
+
+  test-npm-browser:
+    name: test-npm-browser
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Download & verify published @pid7/ashwa package (Browser / WASM SIMD)
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          mkdir -p test-published-wasm
+          cd test-published-wasm
+          npm init -y
+
+          installed=false
+          for i in {1..30}; do
+            if npm install "@pid7/ashwa@$VERSION" --prefer-online; then
+              installed=true
+              break
+            fi
+            echo "Waiting for @pid7/ashwa@$VERSION on npm registry (attempt $i/30)..."
+            sleep 10
+          done
+
+          if [ "$installed" = false ]; then
+            echo "Failed to install @pid7/ashwa@$VERSION from npm registry after 30 attempts."
+            exit 1
+          fi
+
+          npm install playwright
+
+          cat << 'EOF' > wasm.test.js
+          const { test, describe } = require("node:test");
+          const { strictEqual, rejects } = require("node:assert/strict");
+          const path = require("node:path");
+          const packageDir = path.dirname(require.resolve("@pid7/ashwa/package.json"));
+          const { searchOne, searchTwo, isNative, init, initSync } = require(path.join(packageDir, "browser.js"));
+
+          describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
+            test("Environment & exports verification", async () => {
+              strictEqual(isNative, false);
+              strictEqual(typeof searchOne, "function");
+              strictEqual(typeof searchTwo, "function");
+              strictEqual(typeof init, "function");
+              strictEqual(typeof initSync, "function");
+
+              await init();
+            });
+
+            test("Basic searchOne operations", async () => {
+              const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+              strictEqual(await searchOne(haystack, "a".charCodeAt(0)), 0);
+              strictEqual(await searchOne(haystack, "m".charCodeAt(0)), 12);
+              strictEqual(await searchOne(haystack, "z".charCodeAt(0)), 25);
+              strictEqual(await searchOne(haystack, "A".charCodeAt(0)), null);
+            });
+
+            test("Basic searchTwo operations", async () => {
+              const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+              strictEqual(await searchTwo(haystack, Buffer.from("ab")), 0);
+              strictEqual(await searchTwo(haystack, Buffer.from("mn")), 12);
+              strictEqual(await searchTwo(haystack, Buffer.from("yz")), 24);
+              strictEqual(await searchTwo(haystack, Buffer.from("AB")), null);
+              strictEqual(await searchTwo(haystack, [0x61, 0x62]), 0);
+            });
+
+            test("Pangram spot-checks for searchTwo", async () => {
+              const haystack = Buffer.from("the quick brown fox jumps over the lazy dog");
+              strictEqual(await searchTwo(haystack, Buffer.from("th")), 0);
+              strictEqual(await searchTwo(haystack, Buffer.from("he")), 1);
+              strictEqual(await searchTwo(haystack, Buffer.from("qu")), 4);
+              strictEqual(await searchTwo(haystack, Buffer.from("ox")), 17);
+              strictEqual(await searchTwo(haystack, Buffer.from("do")), 40);
+              strictEqual(await searchTwo(haystack, Buffer.from("og")), 41);
+              strictEqual(await searchTwo(haystack, Buffer.from("ZZ")), null);
+              strictEqual(await searchTwo(haystack, Buffer.from("!!")), null);
+            });
+
+            test("Empty buffer search", async () => {
+              const emptyUint8 = new Uint8Array(0);
+              const emptyBuf = Buffer.alloc(0);
+              strictEqual(await searchOne(emptyUint8, 65), null);
+              strictEqual(await searchOne(emptyBuf, 65), null);
+              strictEqual(await searchTwo(emptyUint8, Buffer.from("ab")), null);
+              strictEqual(await searchTwo(emptyBuf, Buffer.from("ab")), null);
+              strictEqual(await searchTwo(Buffer.from("a"), Buffer.from("ab")), null);
+            });
+
+            test("Multiple occurrences return first match", async () => {
+              const haystack = Buffer.from("banana");
+              strictEqual(await searchOne(haystack, "a".charCodeAt(0)), 1);
+              strictEqual(searchOne(haystack, "n".charCodeAt(0)), 2);
+              strictEqual(await searchTwo(haystack, Buffer.from("an")), 1);
+              strictEqual(await searchTwo(haystack, Buffer.from("na")), 2);
+            });
+
+            test("Binary data & extreme byte values (0x00 and 0xFF)", () => {
+              const data = new Uint8Array([0x10, 0x20, 0x00, 0x30, 0xff, 0x40]);
+              strictEqual(await searchOne(data, 0x00), 2);
+              strictEqual(await searchOne(data, 0xff), 4);
+              strictEqual(await searchOne(data, 0x99), null);
+
+              const binaryData = new Uint8Array([0x10, 0x00, 0x00, 0x30, 0xfe, 0xff, 0x40]);
+              strictEqual(await searchTwo(binaryData, new Uint8Array([0x00, 0x00])), 1);
+              strictEqual(await searchTwo(binaryData, new Uint8Array([0xfe, 0xff])), 4);
+              strictEqual(await searchTwo(binaryData, new Uint8Array([0xff, 0xff])), null);
+            });
+
+            test("Overlapping & repeating patterns", async () => {
+              strictEqual(await searchTwo(Buffer.from("aaaaaa"), Buffer.from("aa")), 0);
+              strictEqual(await searchTwo(Buffer.from("baaaaa"), Buffer.from("aa")), 1);
+              strictEqual(await searchTwo(Buffer.from("bbaaaa"), Buffer.from("aa")), 2);
+              strictEqual(await searchTwo(Buffer.from("ababab"), Buffer.from("ab")), 0);
+              strictEqual(await searchTwo(Buffer.from("bababa"), Buffer.from("ab")), 1);
+
+              const allA = Buffer.alloc(256, "A");
+              strictEqual(await searchTwo(allA, Buffer.from("AB")), null);
+              allA[120] = "B".charCodeAt(0);
+              strictEqual(await searchTwo(allA, Buffer.from("AB")), 119);
+            });
+
+            test("Buffer types compatibility (Buffer vs Uint8Array vs Subarray)", async () => {
+              const rawArray = [10, 20, 30, 40, 50, 60, 70, 80];
+              const uint8 = new Uint8Array(rawArray);
+              const nodeBuf = Buffer.from(rawArray);
+              const subarray = uint8.subarray(2, 6);
+
+              strictEqual(await searchOne(uint8, 50), 4);
+              strictEqual(await searchOne(nodeBuf, 50), 4);
+              strictEqual(await searchOne(subarray, 50), 2);
+
+              strictEqual(await searchTwo(uint8, new Uint8Array([50, 60])), 4);
+              strictEqual(await searchTwo(nodeBuf, Buffer.from([50, 60])), 4);
+              strictEqual(await searchTwo(subarray, [50, 60]), 2);
+            });
+
+            test("Unaligned byteOffset subarray searches", async () => {
+              const memory = new ArrayBuffer(128);
+              const view = new Uint8Array(memory, 7, 50);
+              view.fill(0x55);
+              view[19] = 0xaa;
+              view[20] = 0xbb;
+
+              strictEqual(await searchOne(view, 0xaa), 19);
+              strictEqual(await searchTwo(view, new Uint8Array([0xaa, 0xbb])), 19);
+            });
+
+            test("SIMD boundary & chunk sizes", async () => {
+              const sizes = [
+                1, 2, 3, 7, 8, 9, 15, 16, 17, 24, 25, 31, 32, 33, 34, 63, 64, 65, 127,
+                128, 255, 256,
+              ];
+
+              for (const size of sizes) {
+                const buf = new Uint8Array(size);
+                buf.fill(0xaa);
+
+                buf[0] = 0xbb;
+                strictEqual(await searchOne(buf, 0xbb), 0);
+
+                buf[0] = 0xaa;
+                buf[size - 1] = 0xbb;
+                strictEqual(await searchOne(buf, 0xbb), size - 1);
+
+                if (size > 2) {
+                  const mid = Math.floor(size / 2);
+                  buf[size - 1] = 0xaa;
+                  buf[mid] = 0xbb;
+                  strictEqual(await searchOne(buf, 0xbb), mid);
+                }
+              }
+
+              for (const size of sizes.filter((s) => s >= 2)) {
+                const buf = new Uint8Array(size);
+                buf.fill(0xaa);
+
+                buf[0] = 0xbb;
+                buf[1] = 0xcc;
+                strictEqual(await searchTwo(buf, [0xbb, 0xcc]), 0);
+
+                buf[0] = 0xaa;
+                buf[1] = 0xaa;
+                buf[size - 2] = 0xbb;
+                buf[size - 1] = 0xcc;
+                strictEqual(searchTwo(buf, [0xbb, 0xcc]), size - 2);
+
+                if (size > 3) {
+                  const mid = Math.floor(size / 2);
+                  buf[size - 2] = 0xaa;
+                  buf[size - 1] = 0xaa;
+                  buf[mid] = 0xbb;
+                  buf[mid + 1] = 0xcc;
+                  strictEqual(searchTwo(buf, [0xbb, 0xcc]), mid);
+                }
+              }
+            });
+
+            test("Straddling chunk boundaries for searchTwo", async () => {
+              const crossPositions = [
+                0x03, 0x04, 0x07, 0x08, 0x0b, 0x0c, 0x0f, 0x10, 0x13, 0x14, 0x17, 0x18,
+                0x1b, 0x1c, 0x1f, 0x20, 0x27, 0x28, 0x3f, 0x40,
+              ];
+              const crossBuf = Buffer.alloc(0x80, "-");
+              for (const pos of crossPositions) {
+                crossBuf[pos] = "Y".charCodeAt(0);
+                crossBuf[pos + 1] = "Z".charCodeAt(0);
+                strictEqual(await searchTwo(crossBuf, Buffer.from("YZ")), pos);
+                crossBuf[pos] = "-".charCodeAt(0);
+                crossBuf[pos + 1] = "-".charCodeAt(0);
+              }
+            });
+
+            test("Large payload search (1MB payload)", async () => {
+              const size = 1024 * 1024;
+              const buf = new Uint8Array(size);
+              buf.fill(0x41);
+
+              const targetIndices = [0, 15, 16, 31, 32, 63, 64, 5000, 50000, size - 2];
+              for (const idx of targetIndices) {
+                buf[idx] = 0x42;
+                strictEqual(await searchOne(buf, 0x42), idx);
+                buf[idx + 1] = 0x43;
+                strictEqual(await searchTwo(buf, [0x42, 0x43]), idx);
+                buf[idx] = 0x41;
+                buf[idx + 1] = 0x41;
+              }
+            });
+
+            test("Randomized data correctness test", async () => {
+              const size = 4096;
+              const buf = new Uint8Array(size);
+              for (let i = 0; i < size; i++) {
+                buf[i] = (i * 31 + 7) % 255;
+              }
+
+              const testPositions = [
+                0, 1, 15, 16, 30, 31, 32, 63, 64, 100, 511, 1023, 2047, 4094,
+              ];
+              for (const pos of testPositions) {
+                buf[pos] = 255;
+                strictEqual(await searchOne(buf, 255), pos);
+                buf[pos + 1] = 254;
+                strictEqual(await searchTwo(buf, [255, 254]), pos);
+                buf[pos] = (pos * 31 + 7) % 255;
+                buf[pos + 1] = ((pos + 1) * 31 + 7) % 255;
+              }
+            });
+
+            test("Argument validation and type handling", async () => {
+              await rejects(async () => searchOne(null, 65));
+              await rejects(async () => searchOne(undefined, 65));
+              await rejects(async () => searchOne("not_a_buffer", 65));
+              await rejects(async () => searchOne(new Uint8ClampedArray([10, 20]), 20));
+
+              await rejects(async () => searchTwo(null, [65, 66]));
+              await rejects(async () => searchTwo(undefined, [65, 66]));
+              await rejects(async () => searchTwo("not_a_buffer", [65, 66]));
+              await rejects(async () => searchTwo(new Uint8Array([10, 20]), null));
+              await rejects(async () => searchTwo(new Uint8Array([10, 20]), undefined));
+              await rejects(async () => searchTwo(new Uint8Array([10, 20]), []));
+              await rejects(async () => searchTwo(new Uint8Array([10, 20]), [65]));
+              await rejects(async () => searchTwo(new Uint8Array([10, 20]), [65, 66, 67]));
+              await rejects(async () => searchTwo(new Uint8Array([10, 20]), new Uint8Array([65])));
+              await rejects(async () =>
+                searchTwo(new Uint8Array([10, 20]), new Uint8Array([65, 66, 67])),
+              );
+            });
+          });
+          EOF
+
+          cat << 'EOF' > wasm.test.mjs
+          import { test, describe } from "node:test";
+          import assert from "node:assert/strict";
+          import { createRequire } from "node:module";
+          import path from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const require = createRequire(import.meta.url);
+          const packageDir = path.dirname(require.resolve("@pid7/ashwa/package.json"));
+          const { searchOne, searchTwo, isNative, init, initSync } = await import(
+            pathToFileURL(path.join(packageDir, "browser.mjs")).href
+          );
+
+          describe("WebAssembly Backend ESM (@pid7/ashwa/browser)", () => {
+            test("ESM exports and basic search", async () => {
+              assert.strictEqual(typeof searchOne, "function");
+              assert.strictEqual(typeof searchTwo, "function");
+
+              await init();
+              initSync();
+
+              const buf = Buffer.from("ESM Browser WASM test suite");
+              assert.strictEqual(await searchOne(buf, "B".charCodeAt(0)), 4);
+              assert.strictEqual(await searchOne(buf, "Z".charCodeAt(0)), null);
+
+              assert.strictEqual(await searchTwo(buf, Buffer.from("Br")), 4);
+              assert.strictEqual(await searchTwo(buf, [0x42, 0x72]), 4);
+              assert.strictEqual(await searchTwo(buf, Buffer.from("ZZ")), null);
+            });
+          });
+          EOF
+
+          cat << 'EOF' > browser.test.js
+          const { test, describe } = require("node:test");
+          const assert = require("node:assert/strict");
+          const path = require("node:path");
+          const fs = require("node:fs");
+          const { chromium } = require("playwright");
+
+          describe("Headless Browser WASM SIMD128 Execution", () => {
+            let browser;
+            let page;
+
+            test("Initialize Headless Chromium", async () => {
+              try {
+                browser = await chromium.launch({
+                  headless: true,
+                  args: ["--no-sandbox", "--disable-setuid-sandbox"],
+                });
+                page = await browser.newPage();
+              } catch (e) {
+                console.warn("Skipping browser launch if chromium unavailable:", e.message);
+              }
+            });
+
+            test("Execute WASM SIMD128 in Headless Browser context", async () => {
+              if (!page) return;
+
+              const packageDir = path.dirname(require.resolve("@pid7/ashwa/package.json"));
+              const wasmPath = path.join(packageDir, "wasm/pkg/ashwa_wasm_bg.wasm");
+              const wasmBytes = fs.readFileSync(wasmPath);
+              const wasmBase64 = wasmBytes.toString("base64");
+
+              const jsCode = fs.readFileSync(
+                path.join(packageDir, "wasm/pkg/ashwa_wasm.js"),
+                "utf8",
+              );
+
+              const result = await page.evaluate(
+                async ({ code, base64 }) => {
+                  const binaryString = atob(base64);
+                  const len = binaryString.length;
+                  const bytes = new Uint8Array(len);
+                  for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                  }
+
+                  const blob = new Blob([code], { type: "application/javascript" });
+                  const url = URL.createObjectURL(blob);
+                  const mod = await import(url);
+
+                  await mod.default({ module_or_path: bytes.buffer });
+
+                  const haystack = new TextEncoder().encode(
+                    "Hello, World! SIMD128 Headless Chrome Test.",
+                  );
+                  const matchW = mod.searchOne(haystack, "W".charCodeAt(0));
+                  const matchZ = mod.searchOne(haystack, "Z".charCodeAt(0));
+
+                  const needleWo = new TextEncoder().encode("Wo");
+                  const needleZZ = new TextEncoder().encode("ZZ");
+                  const matchWo = mod.searchTwo(haystack, needleWo);
+                  const matchZZ = mod.searchTwo(haystack, needleZZ);
+
+                  return { matchW, matchZ, matchWo, matchZZ };
+                },
+                { code: jsCode, base64: wasmBase64 },
+              );
+
+              assert.strictEqual(result.matchW, 7);
+              assert.strictEqual(result.matchZ, null);
+              assert.strictEqual(result.matchWo, 7);
+              assert.strictEqual(result.matchZZ, null);
+            });
+
+            test("Teardown Headless Chromium", async () => {
+              if (browser) {
+                await browser.close();
+              }
+            });
+          });
+          EOF
+
+          npx playwright install --with-deps chromium
+          node --test wasm.test.js wasm.test.mjs browser.test.js
+
+  test-pypi:
+    name: test-pypi (${{ matrix.name }})
+    needs: resolve-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "linux-x86_64"
+            os: ubuntu-latest
+
+          - name: "linux-aarch64"
+            os: ubuntu-24.04-arm
+
+          - name: "macos-aarch64"
+            os: macos-latest
+
+          - name: "windows-x86_64"
+            os: windows-latest
+
+          - name: "windows-aarch64"
+            os: windows-11-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Download & verify published ashwa package with pytest
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          installed=false
+          for i in {1..30}; do
+            if pip install "ashwa==$VERSION" --no-cache-dir; then
+              installed=true
+              break
+            fi
+            echo "Waiting for ashwa==$VERSION on PyPI (attempt $i/30)..."
+            sleep 10
+          done
+
+          if [ "$installed" = false ]; then
+            echo "Failed to install ashwa==$VERSION from PyPI after 30 attempts."
+            exit 1
+          fi
+
+          pip install pytest
+          cd pypi
+          pytest
