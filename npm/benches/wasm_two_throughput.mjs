@@ -1,23 +1,17 @@
 /**
- * Ashwa Throughput & Latency Microbenchmark Suite (WebAssembly SIMD128)
+ * Ashwa searchTwo Throughput & Latency Microbenchmark Suite (WebAssembly SIMD128)
  */
 
-const fs = require("fs");
-const path = require("path");
-const wasm = require("../wasm/pkg/ashwa_wasm.js");
+import { initSync, searchTwo } from "@pid7/ashwa/browser";
 
-const wasmPath = path.join(__dirname, "../wasm/pkg/ashwa_wasm_bg.wasm");
-const wasmBytes = fs.readFileSync(wasmPath);
-wasm.initSync({ module: wasmBytes });
-
-const searchOne = wasm.searchOne;
+initSync();
 
 const KB = 0x400;
 const MB = KB * KB;
 const GB = 0x400 * MB;
 const SAMPLES = 0x200;
 
-const TIERS = [
+export const TIERS = [
   { name: "L1", size: 0x20 * KB },
   { name: "L2", size: 0x200 * KB },
   { name: "L3", size: 0x10 * MB },
@@ -29,7 +23,7 @@ const TIERS = [
 // Anti-DCE (Dead Code Elimination) optimization barrier sink
 let blackHole = null;
 
-function formatSize(bytes) {
+export function formatSize(bytes) {
   if (bytes >= GB) {
     return `${Math.floor(bytes / GB)} GiB`;
   } else if (bytes >= MB) {
@@ -41,7 +35,7 @@ function formatSize(bytes) {
   return `${bytes} B`;
 }
 
-function formatLatency(secs) {
+export function formatLatency(secs) {
   const nanos = secs * 1e9;
 
   if (nanos < 1_000.0) {
@@ -55,7 +49,7 @@ function formatLatency(secs) {
   return `${secs.toFixed(2)} s`;
 }
 
-function benchmarkTier(tier, haystack, needle) {
+export async function benchmarkTier(tier, haystack, needle) {
   const size = tier.size;
   const slice = haystack.subarray(0, size);
 
@@ -67,7 +61,7 @@ function benchmarkTier(tier, haystack, needle) {
     (Number(process.hrtime.bigint() - warmupStart) < 0x5f5e100 && warmupIters < 0x40) ||
     warmupIters < 2
   ) {
-    blackHole = searchOne(slice, needle);
+    blackHole = await searchTwo(slice, needle);
     warmupIters++;
   }
 
@@ -75,7 +69,7 @@ function benchmarkTier(tier, haystack, needle) {
   const probeIters = Math.max(0x0a, Math.floor(warmupIters / 0x0a));
 
   for (let i = 0; i < probeIters; i++) {
-    blackHole = searchOne(slice, needle);
+    blackHole = await searchTwo(slice, needle);
   }
 
   const probeElapsedSecs = Number(process.hrtime.bigint() - probeStart) / 1e9;
@@ -88,7 +82,7 @@ function benchmarkTier(tier, haystack, needle) {
     const sampleStart = process.hrtime.bigint();
 
     for (let b = 0; b < batchSize; b++) {
-      blackHole = searchOne(slice, needle);
+      blackHole = await searchTwo(slice, needle);
     }
 
     const elapsedSecs = Number(process.hrtime.bigint() - sampleStart) / 1e9;
@@ -108,7 +102,7 @@ function benchmarkTier(tier, haystack, needle) {
   };
 }
 
-function printTable(results) {
+export function printTable(results) {
   const colTier = "Tier / Level";
   const colSize = "Size";
   const colLat = "Latency (Median)";
@@ -136,8 +130,8 @@ function printTable(results) {
   console.log(divider);
 }
 
-function main() {
-  const needle = 0x0a;
+export async function main() {
+  const needle = new Uint8Array([0x0a, 0x0b]);
   const maxSize = Math.max(...TIERS.map((t) => t.size));
 
   const haystack = new Uint8Array(maxSize);
@@ -148,19 +142,10 @@ function main() {
 
   const results = [];
   for (const tier of TIERS) {
-    results.push(benchmarkTier(tier, haystack, needle));
+    results.push(await benchmarkTier(tier, haystack, needle));
   }
 
   printTable(results);
 }
 
-if (require.main === module) {
-  main();
-}
-
-module.exports = {
-  benchmarkTier,
-  printTable,
-  TIERS,
-  main,
-};
+await main();

@@ -2,14 +2,14 @@
  * Ashwa Throughput & Latency Microbenchmark Suite (Node.js / V8 Native N-API)
  */
 
-const { searchTwo } = require("../index.js");
+import { searchTwo } from "@pid7/ashwa";
 
 const KB = 0x400;
 const MB = KB * KB;
 const GB = 0x400 * MB;
 const SAMPLES = 0x200;
 
-const TIERS = [
+export const TIERS = [
   { name: "L1", size: 0x20 * KB },
   { name: "L2", size: 0x200 * KB },
   { name: "L3", size: 0x10 * MB },
@@ -21,7 +21,7 @@ const TIERS = [
 // Anti-DCE (Dead Code Elimination) optimization barrier sink
 let blackHole = null;
 
-function formatSize(bytes) {
+export function formatSize(bytes) {
   if (bytes >= GB) {
     return `${Math.floor(bytes / GB)} GiB`;
   } else if (bytes >= MB) {
@@ -33,7 +33,7 @@ function formatSize(bytes) {
   return `${bytes} B`;
 }
 
-function formatLatency(secs) {
+export function formatLatency(secs) {
   const nanos = secs * 1e9;
 
   if (nanos < 1_000.0) {
@@ -47,7 +47,7 @@ function formatLatency(secs) {
   return `${secs.toFixed(2)} s`;
 }
 
-function benchmarkTier(tier, haystack, needle) {
+export function benchmarkTier(tier, haystack, needle) {
   const size = tier.size;
   const slice = haystack.subarray(0, size);
 
@@ -100,7 +100,7 @@ function benchmarkTier(tier, haystack, needle) {
   };
 }
 
-function printTable(results) {
+export function printTable(results) {
   const colTier = "Tier / Level";
   const colSize = "Size";
   const colLat = "Latency (Median)";
@@ -128,7 +128,7 @@ function printTable(results) {
   console.log(divider);
 }
 
-function main() {
+export function main() {
   const needle = new Uint8Array([0x0a, 0x0b]);
   const maxSize = Math.max(...TIERS.map((t) => t.size));
 
@@ -146,13 +146,4 @@ function main() {
   printTable(results);
 }
 
-if (require.main === module) {
-  main();
-}
-
-module.exports = {
-  benchmarkTier,
-  printTable,
-  TIERS,
-  main,
-};
+main();
