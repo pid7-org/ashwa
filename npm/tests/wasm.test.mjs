@@ -1,12 +1,13 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { searchOne, searchTwo, isNative, init } from "@pid7/ashwa/browser";
+import { searchOne, searchTwo, searchThree, isNative, init } from "@pid7/ashwa/browser";
 
 describe("WebAssembly Backend ESM (browser.mjs)", () => {
   test("ESM exports and basic search", async () => {
     assert.strictEqual(isNative, false);
     assert.strictEqual(typeof searchOne, "function");
     assert.strictEqual(typeof searchTwo, "function");
+    assert.strictEqual(typeof searchThree, "function");
 
     await init();
 
@@ -17,5 +18,9 @@ describe("WebAssembly Backend ESM (browser.mjs)", () => {
     assert.strictEqual(await searchTwo(buf, Buffer.from("WA")), 4);
     assert.strictEqual(await searchTwo(buf, [0x57, 0x41]), 4);
     assert.strictEqual(await searchTwo(buf, Buffer.from("ZZ")), null);
+
+    assert.strictEqual(await searchThree(buf, Buffer.from("WAS")), 4);
+    assert.strictEqual(await searchThree(buf, [0x57, 0x41, 0x53]), 4);
+    assert.strictEqual(await searchThree(buf, Buffer.from("ZZZ")), null);
   });
 });

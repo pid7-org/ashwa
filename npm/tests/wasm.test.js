@@ -1,12 +1,13 @@
 const { test, describe } = require("node:test");
 const { strictEqual, rejects } = require("node:assert/strict");
-const { searchOne, searchTwo, isNative, init, initSync } = require("@pid7/ashwa/browser");
+const { searchOne, searchTwo, searchThree, isNative, init, initSync } = require("@pid7/ashwa/browser");
 
 describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
   test("Environment & exports verification", async () => {
     strictEqual(isNative, false);
     strictEqual(typeof searchOne, "function");
     strictEqual(typeof searchTwo, "function");
+    strictEqual(typeof searchThree, "function");
     strictEqual(typeof init, "function");
     strictEqual(typeof initSync, "function");
 
@@ -32,7 +33,17 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     strictEqual(await searchTwo(haystack, [0x61, 0x62]), 0);
   });
 
-  test("Pangram spot-checks for searchTwo", async () => {
+  test("Basic searchThree operations", async () => {
+    const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+
+    strictEqual(await searchThree(haystack, Buffer.from("abc")), 0);
+    strictEqual(await searchThree(haystack, Buffer.from("mno")), 12);
+    strictEqual(await searchThree(haystack, Buffer.from("xyz")), 23);
+    strictEqual(await searchThree(haystack, Buffer.from("ABC")), null);
+    strictEqual(await searchThree(haystack, [0x61, 0x62, 0x63]), 0);
+  });
+
+  test("Pangram spot-checks for searchTwo and searchThree", async () => {
     const haystack = Buffer.from("the quick brown fox jumps over the lazy dog");
 
     strictEqual(await searchTwo(haystack, Buffer.from("th")), 0);
@@ -43,6 +54,13 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     strictEqual(await searchTwo(haystack, Buffer.from("og")), 41);
     strictEqual(await searchTwo(haystack, Buffer.from("ZZ")), null);
     strictEqual(await searchTwo(haystack, Buffer.from("!!")), null);
+
+    strictEqual(await searchThree(haystack, Buffer.from("the")), 0);
+    strictEqual(await searchThree(haystack, Buffer.from("qui")), 4);
+    strictEqual(await searchThree(haystack, Buffer.from("fox")), 16);
+    strictEqual(await searchThree(haystack, Buffer.from("dog")), 40);
+    strictEqual(await searchThree(haystack, Buffer.from("ZZZ")), null);
+    strictEqual(await searchThree(haystack, Buffer.from("!!!")), null);
   });
 
   test("Empty buffer search", async () => {
@@ -57,6 +75,10 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
 
     const singleByte = Buffer.from("a");
     strictEqual(await searchTwo(singleByte, Buffer.from("ab")), null);
+    strictEqual(await searchThree(emptyUint8, Buffer.from("abc")), null);
+    strictEqual(await searchThree(emptyBuf, Buffer.from("abc")), null);
+    strictEqual(await searchThree(singleByte, Buffer.from("abc")), null);
+    strictEqual(await searchThree(Buffer.from("ab"), Buffer.from("abc")), null);
   });
 
   test("Multiple occurrences return first match", async () => {
@@ -66,6 +88,9 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
 
     strictEqual(await searchTwo(haystack, Buffer.from("an")), 1);
     strictEqual(await searchTwo(haystack, Buffer.from("na")), 2);
+
+    strictEqual(await searchThree(haystack, Buffer.from("ana")), 1);
+    strictEqual(await searchThree(haystack, Buffer.from("nan")), 2);
   });
 
   test("Binary data & extreme byte values (0x00 and 0xFF)", async () => {
@@ -84,6 +109,16 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
       await searchTwo(binaryData, new Uint8Array([0xff, 0xff])),
       null,
     );
+
+    const binaryData3 = new Uint8Array([
+      0x10, 0x00, 0x00, 0x00, 0x30, 0xfd, 0xfe, 0xff, 0x40,
+    ]);
+    strictEqual(await searchThree(binaryData3, new Uint8Array([0x00, 0x00, 0x00])), 1);
+    strictEqual(await searchThree(binaryData3, new Uint8Array([0xfd, 0xfe, 0xff])), 5);
+    strictEqual(
+      await searchThree(binaryData3, new Uint8Array([0xff, 0xff, 0xff])),
+      null,
+    );
   });
 
   test("Overlapping & repeating patterns", async () => {
@@ -93,10 +128,21 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     strictEqual(await searchTwo(Buffer.from("ababab"), Buffer.from("ab")), 0);
     strictEqual(await searchTwo(Buffer.from("bababa"), Buffer.from("ab")), 1);
 
+    strictEqual(await searchThree(Buffer.from("aaaaaa"), Buffer.from("aaa")), 0);
+    strictEqual(await searchThree(Buffer.from("baaaaa"), Buffer.from("aaa")), 1);
+    strictEqual(await searchThree(Buffer.from("bbaaaa"), Buffer.from("aaa")), 2);
+    strictEqual(await searchThree(Buffer.from("abcabc"), Buffer.from("abc")), 0);
+    strictEqual(await searchThree(Buffer.from("zabcabc"), Buffer.from("abc")), 1);
+
     const allA = Buffer.alloc(256, "A");
     strictEqual(await searchTwo(allA, Buffer.from("AB")), null);
     allA[120] = "B".charCodeAt(0);
     strictEqual(await searchTwo(allA, Buffer.from("AB")), 119);
+
+    const allA3 = Buffer.alloc(256, "A");
+    allA3[120] = "B".charCodeAt(0);
+    allA3[121] = "C".charCodeAt(0);
+    strictEqual(await searchThree(allA3, Buffer.from("ABC")), 119);
   });
 
   test("Buffer types compatibility (Buffer vs Uint8Array vs Subarray)", async () => {
@@ -104,7 +150,7 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
 
     const uint8 = new Uint8Array(rawArray);
     const nodeBuf = Buffer.from(rawArray);
-    const subarray = uint8.subarray(2, 6);
+    const subarray = uint8.subarray(2, 7);
 
     strictEqual(await searchOne(uint8, 50), 4);
     strictEqual(await searchOne(nodeBuf, 50), 4);
@@ -113,6 +159,10 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     strictEqual(await searchTwo(uint8, new Uint8Array([50, 60])), 4);
     strictEqual(await searchTwo(nodeBuf, Buffer.from([50, 60])), 4);
     strictEqual(await searchTwo(subarray, [50, 60]), 2);
+
+    strictEqual(await searchThree(uint8, new Uint8Array([50, 60, 70])), 4);
+    strictEqual(await searchThree(nodeBuf, Buffer.from([50, 60, 70])), 4);
+    strictEqual(await searchThree(subarray, [50, 60, 70]), 2);
   });
 
   test("Unaligned byteOffset subarray searches", async () => {
@@ -121,10 +171,12 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     view.fill(0x55);
     view[19] = 0xaa;
     view[20] = 0xbb;
+    view[21] = 0xcc;
 
     // NOTE: Unaligned buffer views must compute relative index correctly
     strictEqual(await searchOne(view, 0xaa), 19);
     strictEqual(await searchTwo(view, new Uint8Array([0xaa, 0xbb])), 19);
+    strictEqual(await searchThree(view, new Uint8Array([0xaa, 0xbb, 0xcc])), 19);
   });
 
   test("WASM SIMD128 boundary & chunk sizes", async () => {
@@ -175,9 +227,38 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
         strictEqual(await searchTwo(buf, [0xbb, 0xcc]), mid);
       }
     }
+
+    for (const size of sizes.filter((s) => s >= 3)) {
+      const buf = new Uint8Array(size);
+      buf.fill(0xaa);
+
+      buf[0] = 0xbb;
+      buf[1] = 0xcc;
+      buf[2] = 0xdd;
+      strictEqual(await searchThree(buf, [0xbb, 0xcc, 0xdd]), 0);
+
+      buf[0] = 0xaa;
+      buf[1] = 0xaa;
+      buf[2] = 0xaa;
+      buf[size - 3] = 0xbb;
+      buf[size - 2] = 0xcc;
+      buf[size - 1] = 0xdd;
+      strictEqual(await searchThree(buf, [0xbb, 0xcc, 0xdd]), size - 3);
+
+      if (size > 4) {
+        const mid = Math.floor(size / 2);
+        buf[size - 3] = 0xaa;
+        buf[size - 2] = 0xaa;
+        buf[size - 1] = 0xaa;
+        buf[mid] = 0xbb;
+        buf[mid + 1] = 0xcc;
+        buf[mid + 2] = 0xdd;
+        strictEqual(await searchThree(buf, [0xbb, 0xcc, 0xdd]), mid);
+      }
+    }
   });
 
-  test("Straddling chunk boundaries for searchTwo", async () => {
+  test("Straddling chunk boundaries for searchTwo and searchThree", async () => {
     const crossPositions = [
       0x03, 0x04, 0x07, 0x08, 0x0b, 0x0c, 0x0f, 0x10, 0x13, 0x14, 0x17, 0x18,
       0x1b, 0x1c, 0x1f, 0x20, 0x27, 0x28, 0x3f, 0x40,
@@ -190,6 +271,17 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
       crossBuf[pos] = "-".charCodeAt(0);
       crossBuf[pos + 1] = "-".charCodeAt(0);
     }
+
+    const crossBuf3 = Buffer.alloc(0x80, "-");
+    for (const pos of crossPositions) {
+      crossBuf3[pos] = "X".charCodeAt(0);
+      crossBuf3[pos + 1] = "Y".charCodeAt(0);
+      crossBuf3[pos + 2] = "Z".charCodeAt(0);
+      strictEqual(await searchThree(crossBuf3, Buffer.from("XYZ")), pos);
+      crossBuf3[pos] = "-".charCodeAt(0);
+      crossBuf3[pos + 1] = "-".charCodeAt(0);
+      crossBuf3[pos + 2] = "-".charCodeAt(0);
+    }
   });
 
   test("Large payload search (1MB payload)", async () => {
@@ -197,15 +289,18 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     const buf = new Uint8Array(size);
     buf.fill(0x41);
 
-    const targetIndices = [0, 15, 16, 31, 32, 63, 64, 5000, 50000, size - 2];
+    const targetIndices = [0, 15, 16, 31, 32, 63, 64, 5000, 50000, size - 3];
 
     for (const idx of targetIndices) {
       buf[idx] = 0x42;
       strictEqual(await searchOne(buf, 0x42), idx);
       buf[idx + 1] = 0x43;
       strictEqual(await searchTwo(buf, [0x42, 0x43]), idx);
+      buf[idx + 2] = 0x44;
+      strictEqual(await searchThree(buf, [0x42, 0x43, 0x44]), idx);
       buf[idx] = 0x41;
       buf[idx + 1] = 0x41;
+      buf[idx + 2] = 0x41;
     }
   });
 
@@ -218,15 +313,18 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     }
 
     const testPositions = [
-      0, 1, 15, 16, 30, 31, 32, 63, 64, 100, 511, 1023, 2047, 4094,
+      0, 1, 15, 16, 30, 31, 32, 63, 64, 100, 511, 1023, 2047, 4093,
     ];
     for (const pos of testPositions) {
       buf[pos] = 255;
       strictEqual(await searchOne(buf, 255), pos);
       buf[pos + 1] = 254;
       strictEqual(await searchTwo(buf, [255, 254]), pos);
+      buf[pos + 2] = 253;
+      strictEqual(await searchThree(buf, [255, 254, 253]), pos);
       buf[pos] = (pos * 31 + 7) % 255;
       buf[pos + 1] = ((pos + 1) * 31 + 7) % 255;
+      buf[pos + 2] = ((pos + 2) * 31 + 7) % 255;
     }
   });
 
@@ -245,6 +343,23 @@ describe("WebAssembly Backend (wasm-bindgen SIMD128)", () => {
     );
     await rejects(async () =>
       searchTwo(new Uint8Array([10, 20]), new Uint8Array([65, 66, 67])),
+    );
+
+    await rejects(async () => searchThree(null, [65, 66, 67]));
+    await rejects(async () => searchThree(undefined, [65, 66, 67]));
+    await rejects(async () => searchThree(new Uint8Array([10, 20]), null));
+    await rejects(async () => searchThree(new Uint8Array([10, 20]), undefined));
+    await rejects(async () => searchThree(new Uint8Array([10, 20]), []));
+    await rejects(async () => searchThree(new Uint8Array([10, 20]), [65]));
+    await rejects(async () => searchThree(new Uint8Array([10, 20]), [65, 66]));
+    await rejects(async () =>
+      searchThree(new Uint8Array([10, 20]), [65, 66, 67, 68]),
+    );
+    await rejects(async () =>
+      searchThree(new Uint8Array([10, 20]), new Uint8Array([65, 66])),
+    );
+    await rejects(async () =>
+      searchThree(new Uint8Array([10, 20]), new Uint8Array([65, 66, 67, 68])),
     );
   });
 });
