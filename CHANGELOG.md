@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.2.4] - 2026-08-30
+
+- fix `Illegal instruction` crashes on CPUs with lesser ISA support:
+  - npm native addons and pypi wheels were previously compiled with `-C target-cpu=native`, baking
+    runner-specific vector instructions into the base binary and causing `Illegal instruction` crashes
+    on older x86_64 CPUs
+  - replaced static compile-time flags with dynamic runtime CPUID feature detection and dispatch for
+    AVX-512BW kernels
+  - standardized release CI builds on the stable Rust toolchain and portable baseline flags, guaranteeing
+    universal CPU compatibility while dynamically dispatching to AVX-512BW on supported hardware
+- core:
+  - set MSRV to `1.89.0` (required for stable `#[target_feature(enable = "avx512bw")]`)
+- npm:
+  - add `./browser` and `./package.json` entrypoints to exports map
+  - convert browser test and benchmark suites to native ES Modules (ESM)
+  - pass options object to WebAssembly `initSync` to avoid deprecation warnings
+- ci:
+  - decouple post-publish verification into a standalone workflow (`verify-published.yml`) running isolated
+    test suites across npm (Node.js native, WASM ESM, headless Chromium) and pypi across all platforms
+- docs:
+  - update core, npm, and pypi README(s) with MSRV notes and remove obsolete AVX-512 nightly toolchain requirements
+
 ## [0.2.3] - 2026-08-29
 
 - npm: ensure native loader uses CommonJS exports for cross-bundler compatibility
@@ -31,7 +53,7 @@
   - 64-bit and 32-bit SWAR fallbacks for targets without vector ISAs
   - native Node.js (N-API), browser (WASM SIMD), and Python (CPython) bindings
   - throughput and latency profiling suites and tests across all supported ecosystems
-- build x86_64 native npm and PyPI release artifacts with AVX-512BW feature flags on nightly
+- build x86_64 native npm and pypi release artifacts with AVX-512BW feature flags on nightly
 - improved cross-platform testing in CI
 
 ## [0.2.0] - 2026-08-23
@@ -47,21 +69,22 @@
 
 ## [0.1.7] - 2026-08-19
 
-- optimize release pipeline: sequence crates.io publish before parallel npm and PyPI releases
+- optimize release pipeline: sequence crates.io publish before parallel npm and pypi releases
 - unify native addon and Python wheel builds into a single matrix runner per platform
 - add `--find-interpreter` support to maturin for multi-arch wheel builds (including ARMv7 and i686 Linux)
-- run full `node:test` and `pytest` suites on live published npm and PyPI packages
+- run full `node:test` and `pytest` suites on live published npm and pypi packages
 - simplify and standardize CI job naming across release workflow
 
 ## [0.1.6] - 2026-08-19
 
-- add multi-architecture PyPI wheel build and release workflow (Linux x86_64/ARM64/ARMv7/i686, macOS Apple Silicon, Windows x86_64/ARM64)
-- add Trusted Publishing (OIDC) with provenance attestations for PyPI releases
-- add post-publish verification across native platforms for PyPI package
+- add multi-architecture pypi wheel build and release workflow (Linux x86_64/ARM64/ARMv7/i686, macOS
+  Apple Silicon, Windows x86_64/ARM64)
+- add Trusted Publishing (OIDC) with provenance attestations for pypi releases
+- add post-publish verification across native platforms for pypi package
 
 ## [0.1.5] - 2026-08-18
 
-- publish Python package to [PyPI](https://pypi.org/project/ashwa/)
+- publish Python package to [pypi](https://pypi.org/project/ashwa/)
 
 ## [0.1.4] - 2026-08-10
 
