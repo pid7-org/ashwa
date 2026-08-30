@@ -15,8 +15,13 @@ Examples::
     print(ashwa.search_two(haystack, b"qu"))     # 4
     print(ashwa.search_two(haystack, b"ox"))     # 17
     print(ashwa.search_two(haystack, b"!!"))     # None
+
+    # Search for a three-byte sequence
+    print(ashwa.search_three(haystack, b"qui"))   # 4
+    print(ashwa.search_three(haystack, b"fox"))   # 16
+    print(ashwa.search_three(haystack, b"!!!"))   # None
 """
 
-from .ashwa import search_one, search_two, __version__
+from .ashwa import search_one, search_two, search_three, __version__
 
-__all__ = ["search_one", "search_two", "__version__"]
+__all__ = ["search_one", "search_two", "search_three", "__version__"]
