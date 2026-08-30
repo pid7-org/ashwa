@@ -26,7 +26,7 @@ const TIERS: [TierConfig; 6] = [
     TierConfig { key: "l3", name: "L3 Cache", size: 16 * MB },
     TierConfig { key: "ram", name: "Memory Bound (RAM 256 MiB)", size: 256 * MB },
     TierConfig { key: "ram512", name: "Memory Bound (RAM 512 MiB)", size: 512 * MB },
-    TierConfig { key: "ram1g", name: "Memory Bound (RAM 1 GiB)", size: 1 * GB },
+    TierConfig { key: "ram1g", name: "Memory Bound (RAM 1 GiB)", size: GB },
 ];
 
 #[inline(always)]

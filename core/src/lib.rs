@@ -60,7 +60,7 @@
 #[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
 compile_error!("ashwa is only supported on 64 and 32 bit targets");
 
-#[cfg(all(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use core::{arch::x86_64, sync::atomic};
 
 mod common;
@@ -76,6 +76,7 @@ pub use two::search_two;
 
 #[repr(u8)]
 #[cfg(target_arch = "x86_64")]
+#[allow(clippy::upper_case_acronyms)]
 pub(crate) enum ISA {
     NONE,
     SWAR,
@@ -137,7 +138,7 @@ pub(crate) fn get_cpu_feature() -> ISA {
     let detected = unsafe { detect_features_x86_64() };
     CPU_FEATURE.store(detected as u8, atomic::Ordering::Relaxed);
 
-    detected.into()
+    detected
 }
 
 #[cold]

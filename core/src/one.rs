@@ -719,7 +719,7 @@ mod tests {
         assert_eq!(search_fn(b"\x01\x01\x01\x01\x01\x01\x01\x01", 0x01), Some(0));
         assert_eq!(search_fn(b"\x80\x80\x80\x80\x80\x80\x80\x80", 0x80), Some(0));
 
-        let buffer = vec![b'-'; 0x60];
+        let buffer = [b'-'; 0x60];
         for offset in 1..8 {
             let mut haystack = buffer[offset..].to_vec();
             haystack[0x19] = b'Z';

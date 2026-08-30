@@ -19,7 +19,7 @@ const TIERS: [TierConfig; 6] = [
     TierConfig { name: "L3", size: 0x10 * MB },
     TierConfig { name: "RAM", size: 0x100 * MB },
     TierConfig { name: "RAM", size: 0x200 * MB },
-    TierConfig { name: "RAM", size: 1 * GB },
+    TierConfig { name: "RAM", size: GB },
 ];
 
 struct BenchResult {
@@ -156,7 +156,7 @@ fn print_table(results: &[BenchResult]) {
 
 fn main() {
     let needle = 0x0Au8;
-    let max_size = TIERS.iter().map(|t| t.size).max().unwrap_or(1 * GB);
+    let max_size = TIERS.iter().map(|t| t.size).max().unwrap_or(GB);
 
     let layout = Layout::from_size_align(max_size, 0x40).expect("valid layout");
     let ptr = unsafe { alloc_zeroed(layout) };
