@@ -87,7 +87,8 @@ jobs:
             exit 1
           fi
 
-          node --test ../npm/tests/node.test.js ../npm/tests/node.test.mjs
+          cp -r ../npm/tests .
+          node --test tests/node.test.js tests/node.test.mjs
 
   test-npm-browser:
     name: test-npm-browser
@@ -126,7 +127,8 @@ jobs:
 
           npm install playwright
           npx playwright install --with-deps chromium
-          node --test ../npm/tests/wasm.test.js ../npm/tests/wasm.test.mjs ../npm/tests/browser.test.mjs
+          cp -r ../npm/tests .
+          node --test tests/wasm.test.js tests/wasm.test.mjs tests/browser.test.mjs
 
   test-pypi:
     name: test-pypi (${{ matrix.name }})
