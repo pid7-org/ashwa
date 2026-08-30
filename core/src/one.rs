@@ -82,13 +82,7 @@ pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
         ISA::SWAR => search_one_swar64(haystack, needle),
         ISA::AVX2 => unsafe { search_one_avx2(haystack, needle) },
         ISA::SSE2 | ISA::SSSE3 | ISA::SSE4_2 => unsafe { search_one_sse2(haystack, needle) },
-        ISA::AVX512BW => {
-            #[cfg(not(target_feature = "avx512bw"))]
-            return unsafe { search_one_avx2(haystack, needle) };
-
-            #[cfg(target_feature = "avx512bw")]
-            return unsafe { search_one_avx512(haystack, needle) };
-        }
+        ISA::AVX512BW => unsafe { search_one_avx512(haystack, needle) },
         _ => unreachable!(),
     }
 
@@ -359,8 +353,8 @@ unsafe fn search_one_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
     haystack[i..].iter().position(|&b| b == needle).map(|pos| pos + i)
 }
 
+#[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx512bw")]
-#[cfg(all(target_arch = "x86_64", target_feature = "avx512bw"))]
 unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
     let v_needle = _mm512_set1_epi8(needle as i8);
 
@@ -954,7 +948,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx512bw"))]
+    #[cfg(target_arch = "x86_64")]
     fn test_avx512_directly() {
         if std::is_x86_feature_detected!("avx512bw") {
             run_standard_suite(|h, n| unsafe { search_one_avx512(h, n) });

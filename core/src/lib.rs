@@ -131,16 +131,11 @@ unsafe fn detect_features_x86_64() -> ISA {
 
         if xmm_ymm_enabled {
             let cpuid7 = x86_64::__cpuid_count(7, 0);
+            let avx512_enabled = (xcr0 & 0b11100110) == 0b11100110;
+            let avx512f_bw = (1 << 0x10) | (1 << 0x1E);
 
-            #[cfg(target_feature = "avx512bw")]
-            {
-                let avx512f_bw = (1 << 16) | (1 << 30);
-                let vbmi_vbmi2 = (1 << 1) | (1 << 6);
-                if (cpuid7.ebx & avx512f_bw) == avx512f_bw
-                    && (cpuid7.ecx & vbmi_vbmi2) == vbmi_vbmi2
-                {
-                    return ISA::AVX512BW;
-                }
+            if avx512_enabled && (cpuid7.ebx & avx512f_bw) == avx512f_bw {
+                return ISA::AVX512BW;
             }
 
             if (cpuid7.ebx & (1 << 5)) != 0 {
