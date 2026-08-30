@@ -34,6 +34,17 @@
 //! assert_eq!(search_three(haystack, *b"fox"), Some(0x10));
 //! assert_eq!(search_three(haystack, *b"!!!"), None);
 //! ```
+//!
+//! ### `search_n`
+//!
+//! ```
+//! use ashwa::search_n;
+//!
+//! let haystack = b"The quick brown fox jumps over the lazy dog";
+//! assert_eq!(search_n(haystack, b"quick"), Some(0x04));
+//! assert_eq!(search_n(haystack, b"brown fox"), Some(0x0A));
+//! assert_eq!(search_n(haystack, b"lazy dog!"), None);
+//! ```
 
 #![cfg_attr(not(test), no_std)]
 #![allow(unsafe_op_in_unsafe_fn)]
@@ -53,10 +64,12 @@ compile_error!("ashwa is only supported on 64 and 32 bit targets");
 use core::{arch::x86_64, sync::atomic};
 
 mod common;
+mod n;
 mod one;
 mod three;
 mod two;
 
+pub use n::search_n;
 pub use one::search_one;
 pub use three::search_three;
 pub use two::search_two;
