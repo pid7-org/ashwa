@@ -14,6 +14,7 @@ normalize_target() {
     case "${1,,}" in
         1|one|one_throughput|search_one) echo "one" ;;
         2|two|two_throughput|search_two) echo "two" ;;
+        3|three|three_throughput|search_three) echo "three" ;;
         *) echo "" ;;
     esac
 }
@@ -32,32 +33,46 @@ if [ -z "$BENCH_TARGET" ]; then
         echo "                       ASHWA BENCHMARK SUITE SELECTION                          "
         echo "================================================================================"
         echo " Please select the benchmark suite to run (no default):"
-        echo "   1) one - Single-byte search benchmark (search_one / one_throughput)"
-        echo "   2) two - Two-byte search benchmark (search_two / two_throughput)"
-        read -rp " Select benchmark suite [1/2 or one/two]: " user_choice
+        echo "   1) one   - Single-byte search benchmark (search_one / one_throughput)"
+        echo "   2) two   - Two-byte search benchmark (search_two / two_throughput)"
+        echo "   3) three - Three-byte search benchmark (search_three / three_throughput)"
+        read -rp " Select benchmark suite [1/2/3 or one/two/three]: " user_choice
         BENCH_TARGET=$(normalize_target "$user_choice")
     fi
 fi
 
 if [ -z "$BENCH_TARGET" ]; then
-    echo "Error: BENCH_TARGET is required (no default). Must be 'one' or 'two'."
+    echo "Error: BENCH_TARGET is required (no default). Must be 'one', 'two', or 'three'."
     exit 1
 fi
 
 if [ "$BENCH_TARGET" = "one" ]; then
     SUITE_TITLE="search_one (Single-Byte Needle)"
     CORE_BENCH="one_throughput"
-    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/one_throughput.js"
-    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_throughput.js"
+    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/one_throughput.mjs"
+    [ ! -f "$NPM_NODE_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/one_throughput.js" ] && NPM_NODE_BENCH="$HOME/ashwa/npm/benches/one_throughput.js"
+    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_throughput.mjs"
+    [ ! -f "$NPM_WASM_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/wasm_throughput.js" ] && NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_throughput.js"
     PYPI_BENCH="$HOME/ashwa/pypi/benches/one_throughput.py"
     ILP_EXAMPLE="one_ilp"
-else
+elif [ "$BENCH_TARGET" = "two" ]; then
     SUITE_TITLE="search_two (Two-Byte Needle)"
     CORE_BENCH="two_throughput"
-    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/two_throughput.js"
-    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_two_throughput.js"
+    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/two_throughput.mjs"
+    [ ! -f "$NPM_NODE_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/two_throughput.js" ] && NPM_NODE_BENCH="$HOME/ashwa/npm/benches/two_throughput.js"
+    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_two_throughput.mjs"
+    [ ! -f "$NPM_WASM_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/wasm_two_throughput.js" ] && NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_two_throughput.js"
     PYPI_BENCH="$HOME/ashwa/pypi/benches/two_throughput.py"
     ILP_EXAMPLE="two_ilp"
+elif [ "$BENCH_TARGET" = "three" ]; then
+    SUITE_TITLE="search_three (Three-Byte Needle)"
+    CORE_BENCH="three_throughput"
+    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/three_throughput.mjs"
+    [ ! -f "$NPM_NODE_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/three_throughput.js" ] && NPM_NODE_BENCH="$HOME/ashwa/npm/benches/three_throughput.js"
+    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_three_throughput.mjs"
+    [ ! -f "$NPM_WASM_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/wasm_three_throughput.js" ] && NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_three_throughput.js"
+    PYPI_BENCH="$HOME/ashwa/pypi/benches/three_throughput.py"
+    ILP_EXAMPLE="three_ilp"
 fi
 
 RESULTS_DIR="${RESULTS_DIR:-${HOME}/results/${BENCH_TARGET}}"

@@ -45,9 +45,10 @@ Arguments:
   profile                   AWS CLI profile name (default: \$AWS_PROFILE or 'default')
 
 Benchmark Suite (REQUIRED - no default):
-  -t, --target, --suite <t> Target suite to benchmark: 'one' or 'two'
+  -t, --target, --suite <t> Target suite to benchmark: 'one', 'two', or 'three'
       --one, -1             Benchmark single-byte search (search_one / one_throughput)
       --two, -2             Benchmark two-byte search (search_two / two_throughput)
+      --three, -3           Benchmark three-byte search (search_three / three_throughput)
 
 Options:
   -a, --arch <arch>         Target architecture: 'x86_64', 'aarch64', or 'all'/'parallel' (default: x86_64)
@@ -72,6 +73,7 @@ normalize_target() {
     case "${1,,}" in
         1|one|one_throughput|search_one) echo "one" ;;
         2|two|two_throughput|search_two) echo "two" ;;
+        3|three|three_throughput|search_three) echo "three" ;;
         *) echo "" ;;
     esac
 }
@@ -91,6 +93,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --two|-2)
             BENCH_TARGET="two"
+            shift
+            ;;
+        --three|-3)
+            BENCH_TARGET="three"
             shift
             ;;
         -a|--arch|--architecture)
@@ -148,7 +154,7 @@ while [[ $# -gt 0 ]]; do
                     aarch64|arm64) TARGET_ARCH="aarch64" ;;
                     all|both|parallel) TARGET_ARCH="all" ;;
                 esac
-            elif [[ "$1" =~ ^(1|one|two|2|one_throughput|two_throughput|search_one|search_two)$ ]]; then
+            elif [[ "$1" =~ ^(1|one|two|2|three|3|one_throughput|two_throughput|three_throughput|search_one|search_two|search_three)$ ]]; then
                 BENCH_TARGET=$(normalize_target "$1")
             elif [ -z "$AWS_PROFILE_ARG" ]; then
                 AWS_PROFILE_ARG="$1"
@@ -161,7 +167,7 @@ done
 if [ -n "$BENCH_TARGET" ]; then
     BENCH_TARGET=$(normalize_target "$BENCH_TARGET")
     if [ -z "$BENCH_TARGET" ]; then
-        echo "Error: Invalid benchmark target. Choose 'one' or 'two'."
+        echo "Error: Invalid benchmark target. Choose 'one', 'two', or 'three'."
         exit 1
     fi
 fi
@@ -174,18 +180,19 @@ if [ -z "$BENCH_TARGET" ]; then
         echo "================================================================================"
         echo " Please select the benchmark suite to run (no default):"
         echo ""
-        echo "   1) one  - Single-byte search benchmark (search_one / one_throughput)"
-        echo "   2) two  - Two-byte search benchmark (search_two / two_throughput)"
+        echo "   1) one   - Single-byte search benchmark (search_one / one_throughput)"
+        echo "   2) two   - Two-byte search benchmark (search_two / two_throughput)"
+        echo "   3) three - Three-byte search benchmark (search_three / three_throughput)"
         echo ""
-        read -rp " Select benchmark suite [1/2 or one/two]: " user_choice
+        read -rp " Select benchmark suite [1/2/3 or one/two/three]: " user_choice
         BENCH_TARGET=$(normalize_target "$user_choice")
         if [ -z "$BENCH_TARGET" ]; then
-            echo "Error: Invalid selection '$user_choice'. Predefined options: 'one', 'two'."
+            echo "Error: Invalid selection '$user_choice'. Predefined options: 'one', 'two', 'three'."
             exit 1
         fi
         echo ""
     else
-        echo "Error: Benchmark target is required (no default). Specify --target <one|two>, --one, or --two."
+        echo "Error: Benchmark target is required (no default). Specify --target <one|two|three>, --one, --two, or --three."
         exit 1
     fi
 fi
@@ -499,7 +506,13 @@ echo "                     ASHWA AWS BENCHMARK ORCHESTRATOR                     
 echo "--------------------------------------------------------------------------------"
 echo " Profile:       ${EFFECTIVE_PROFILE:-<environment credentials>}"
 echo " Region:        $REGION"
-echo " Target Suite:  $BENCH_TARGET ($([ "$BENCH_TARGET" = "one" ] && echo "Single-Byte search_one" || echo "Two-Byte search_two"))"
+case "$BENCH_TARGET" in
+    one) TARGET_DESC="Single-Byte search_one" ;;
+    two) TARGET_DESC="Two-Byte search_two" ;;
+    three) TARGET_DESC="Three-Byte search_three" ;;
+    *) TARGET_DESC="$BENCH_TARGET" ;;
+esac
+echo " Target Suite:  $BENCH_TARGET ($TARGET_DESC)"
 echo " Target Arch:   ${EXEC_ARCHES[*]}"
 if [ "${#EXEC_ARCHES[@]}" -eq 1 ]; then
     echo " Instance Type: $(get_instance_type_for_arch "${EXEC_ARCHES[0]}") (64 GiB RAM, 16 vCPUs)"
