@@ -23,6 +23,17 @@
 //! assert_eq!(search_two(haystack, *b"ox"), Some(0x11));
 //! assert_eq!(search_two(haystack, *b"!!"), None);
 //! ```
+//!
+//! ### `search_three`
+//!
+//! ```
+//! use ashwa::search_three;
+//!
+//! let haystack = b"The quick brown fox jumps over the lazy dog";
+//! assert_eq!(search_three(haystack, *b"qui"), Some(0x04));
+//! assert_eq!(search_three(haystack, *b"fox"), Some(0x10));
+//! assert_eq!(search_three(haystack, *b"!!!"), None);
+//! ```
 
 #![cfg_attr(not(test), no_std)]
 #![allow(unsafe_op_in_unsafe_fn)]
@@ -43,9 +54,11 @@ use core::{arch::x86_64, sync::atomic};
 
 mod common;
 mod one;
+mod three;
 mod two;
 
 pub use one::search_one;
+pub use three::search_three;
 pub use two::search_two;
 
 #[repr(u8)]
