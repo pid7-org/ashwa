@@ -11,10 +11,7 @@
  * * `Some(index)` - The 0-based byte index of the first match.
  * * `None` - If `needle` is not found.
  */
-export declare function searchOne(
-  haystack: Uint8Array,
-  needle: number,
-): number | null;
+export declare function searchOne(haystack: Uint8Array, needle: number): number | null
 
 /**
  * Searches for the first occurrence of a two-byte `needle` in `haystack`.
@@ -27,7 +24,4 @@ export declare function searchOne(
  * * `Some(index)` - The 0-based byte index of the first match.
  * * `None` - If `needle` is not found.
  */
-export declare function searchTwo(
-  haystack: Uint8Array,
-  needle: Uint8Array,
-): number | null;
+export declare function searchTwo(haystack: Uint8Array, needle: Uint8Array): number | null
