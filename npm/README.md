@@ -23,12 +23,14 @@ Hardware accelerated routines for single substring search
 - [API Reference](#api-reference)
   - [`searchOne`](#searchone)
   - [`searchTwo`](#searchtwo)
+  - [`searchThree`](#searchthree)
   - [`init`](#init)
   - [`initSync`](#initsync)
   - [`isNative`](#isnative)
 - [Benchmarks](#benchmarks)
   - [`searchOne`](#searchone-1)
   - [`searchTwo`](#searchtwo-1)
+  - [`searchThree`](#searchthree-1)
 
 ## Supported Platforms
 
@@ -113,6 +115,24 @@ Searches for the first occurrence of a two-byte `needle` within `haystack`.
   - In Node.js / Bun / Deno: `number | null` (synchronous 0-based byte index, or `null` if not found).
   - In Browser / WebWorker: `Promise<number | null>` (resolves to 0-based byte index, or `null` if not found).
 
+### `searchThree(haystack, needle)`
+
+```ts
+function searchThree(
+  haystack: Uint8Array,
+  needle: Uint8Array | [number, number, number] | number[],
+): number | null | Promise<number | null>;
+```
+
+Searches for the first occurrence of a three-byte `needle` within `haystack`.
+
+- Parameters:
+  - `haystack`: `Uint8Array` / `Buffer` — The byte sequence to search.
+  - `needle`: `Uint8Array | [number, number, number] | number[]` — A 3-byte sequence to locate.
+- Returns:
+  - In Node.js / Bun / Deno: `number | null` (synchronous 0-based byte index, or `null` if not found).
+  - In Browser / WebWorker: `Promise<number | null>` (resolves to 0-based byte index, or `null` if not found).
+
 ### `init(moduleOrPath?)`
 
 ```typescript
@@ -147,6 +167,7 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 
 - [`searchOne`](#searchone-1)
 - [`searchTwo`](#searchtwo-1)
+- [`searchThree`](#searchthree-1)
 
 > Benchmarks are evaluated across dedicated AWS EC2 hardware environments on Node.js `v22.23.2`,
 >
@@ -209,3 +230,27 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 | RAM        | 256 MiB   | 53.44 ms      | 4.68 GiB/s       |
 | RAM        | 512 MiB   | 106.71 ms     | 4.69 GiB/s       |
 | RAM        | 1 GiB     | 213.08 ms     | 4.69 GiB/s       |
+
+### `searchThree`
+
+#### Native Node.js (V8 N-API)
+
+| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
+|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
+| L1 Cache   | 32 KiB    | 600.64 ns     | 2.26 µs         | 50.81 GiB/s      | 13.50 GiB/s        |
+| L2 Cache   | 512 KiB   | 9.56 µs       | 34.96 µs        | 51.08 GiB/s      | 13.97 GiB/s        |
+| L3 Cache   | 16 MiB    | 487.42 µs     | 1.13 ms         | 32.06 GiB/s      | 13.86 GiB/s        |
+| RAM        | 256 MiB   | 18.66 ms      | 17.96 ms        | 13.40 GiB/s      | 13.92 GiB/s        |
+| RAM        | 512 MiB   | 44.00 ms      | 35.90 ms        | 11.36 GiB/s      | 13.93 GiB/s        |
+| RAM        | 1 GiB     | 87.98 ms      | 71.86 ms        | 11.37 GiB/s      | 13.92 GiB/s        |
+
+#### WebAssembly (WASM SIMD128)
+
+| Level      | Payload   | Latency (x64) | Throughput (x64) |
+|:-----------|:----------|:--------------|:-----------------|
+| L1 Cache   | 32 KiB    | 2.30 µs       | 13.26 GiB/s      |
+| L2 Cache   | 512 KiB   | 34.11 µs      | 14.31 GiB/s      |
+| L3 Cache   | 16 MiB    | 1.82 ms       | 8.58 GiB/s       |
+| RAM        | 256 MiB   | 54.99 ms      | 4.55 GiB/s       |
+| RAM        | 512 MiB   | 114.54 ms     | 4.37 GiB/s       |
+| RAM        | 1 GiB     | 227.27 ms     | 4.40 GiB/s       |
