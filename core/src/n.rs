@@ -11,6 +11,9 @@ use core::arch::x86_64::*;
 #[cfg(target_arch = "x86")]
 use core::arch::x86::*;
 
+#[cfg(target_arch = "wasm32")]
+use core::arch::wasm32::*;
+
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
@@ -84,6 +87,14 @@ pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 #[inline(always)]
 #[cfg(target_pointer_width = "32")]
 pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    #[cfg(target_arch = "wasm32")]
+    {
+        #[cfg(target_feature = "simd128")]
+        return unsafe { search_n_simd128(haystack, needle) };
+
+        search_n_swar32(haystack, needle)
+    }
+
     #[cfg(target_arch = "arm")]
     {
         #[cfg(target_feature = "neon")]
@@ -106,7 +117,7 @@ pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         search_n_swar32(haystack, needle)
     }
 
-    #[cfg(not(any(target_arch = "arm", target_arch = "x86")))]
+    #[cfg(not(any(target_arch = "wasm32", target_arch = "arm", target_arch = "x86")))]
     {
         search_n_swar32(haystack, needle)
     }
@@ -1064,6 +1075,147 @@ unsafe fn verify_candidates_neon_arm32(
     None
 }
 
+#[target_feature(enable = "simd128")]
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+unsafe fn search_n_simd128(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = u8x16_splat(needle[0]);
+    let v_needle_b = u8x16_splat(needle[1]);
+    let v_needle_c = u8x16_splat(needle[n - 1]);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1_a = v128_load(ptr.add(i) as *const v128);
+        let v1_b = v128_load(ptr.add(i + 1) as *const v128);
+        let v1_c = v128_load(ptr.add(i + n - 1) as *const v128);
+
+        let v2_a = v128_load(ptr.add(i + 0x10) as *const v128);
+        let v2_b = v128_load(ptr.add(i + 0x11) as *const v128);
+        let v2_c = v128_load(ptr.add(i + 0x10 + n - 1) as *const v128);
+
+        let v3_a = v128_load(ptr.add(i + 0x20) as *const v128);
+        let v3_b = v128_load(ptr.add(i + 0x21) as *const v128);
+        let v3_c = v128_load(ptr.add(i + 0x20 + n - 1) as *const v128);
+
+        let v4_a = v128_load(ptr.add(i + 0x30) as *const v128);
+        let v4_b = v128_load(ptr.add(i + 0x31) as *const v128);
+        let v4_c = v128_load(ptr.add(i + 0x30 + n - 1) as *const v128);
+
+        let eq1 = v128_and(
+            v128_and(u8x16_eq(v1_a, v_needle_a), u8x16_eq(v1_b, v_needle_b)),
+            u8x16_eq(v1_c, v_needle_c),
+        );
+        let eq2 = v128_and(
+            v128_and(u8x16_eq(v2_a, v_needle_a), u8x16_eq(v2_b, v_needle_b)),
+            u8x16_eq(v2_c, v_needle_c),
+        );
+        let eq3 = v128_and(
+            v128_and(u8x16_eq(v3_a, v_needle_a), u8x16_eq(v3_b, v_needle_b)),
+            u8x16_eq(v3_c, v_needle_c),
+        );
+        let eq4 = v128_and(
+            v128_and(u8x16_eq(v4_a, v_needle_a), u8x16_eq(v4_b, v_needle_b)),
+            u8x16_eq(v4_c, v_needle_c),
+        );
+
+        let or1 = v128_or(eq1, eq2);
+        let or2 = v128_or(eq3, eq4);
+        let or_vec = v128_or(or1, or2);
+
+        if u8x16_bitmask(or_vec) != 0 {
+            let mut m1 = u8x16_bitmask(eq1) as u32;
+            while m1 != 0 {
+                let offset = m1.trailing_zeros() as usize;
+                let cand = i + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m1 &= m1 - 1;
+            }
+
+            let mut m2 = u8x16_bitmask(eq2) as u32;
+            while m2 != 0 {
+                let offset = m2.trailing_zeros() as usize;
+                let cand = i + 0x10 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m2 &= m2 - 1;
+            }
+
+            let mut m3 = u8x16_bitmask(eq3) as u32;
+            while m3 != 0 {
+                let offset = m3.trailing_zeros() as usize;
+                let cand = i + 0x20 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m3 &= m3 - 1;
+            }
+
+            let mut m4 = u8x16_bitmask(eq4) as u32;
+            while m4 != 0 {
+                let offset = m4.trailing_zeros() as usize;
+                let cand = i + 0x30 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m4 &= m4 - 1;
+            }
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 + n - 1 <= len {
+        let v_a = v128_load(ptr.add(i) as *const v128);
+        let v_b = v128_load(ptr.add(i + 1) as *const v128);
+        let v_c = v128_load(ptr.add(i + n - 1) as *const v128);
+
+        let eq = v128_and(
+            v128_and(u8x16_eq(v_a, v_needle_a), u8x16_eq(v_b, v_needle_b)),
+            u8x16_eq(v_c, v_needle_c),
+        );
+        let mut m = u8x16_bitmask(eq) as u32;
+
+        while m != 0 {
+            let offset = m.trailing_zeros() as usize;
+            let cand = i + offset;
+            if &haystack[cand..cand + n] == needle {
+                return Some(cand);
+            }
+            m &= m - 1;
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1339,5 +1491,11 @@ mod tests {
     #[cfg(all(target_arch = "arm", target_feature = "neon"))]
     fn test_neon_arm32_directly() {
         run_standard_suite(|h, n| unsafe { search_n_neon(h, n) });
+    }
+
+    #[test]
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    fn test_simd128_wasm32_directly() {
+        run_standard_suite(|h, n| unsafe { search_n_simd128(h, n) });
     }
 }
