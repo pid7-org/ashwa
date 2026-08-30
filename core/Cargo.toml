@@ -29,6 +29,10 @@ harness = false
 name = "two_throughput"
 harness = false
 
+[[bench]]
+name = "three_throughput"
+harness = false
+
 [[example]]
 name = "one_ilp"
 
