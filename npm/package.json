@@ -30,7 +30,13 @@
       "import": "./browser.mjs",
       "require": "./index.js",
       "default": "./index.js"
-    }
+    },
+    "./browser": {
+      "types": "./index.d.ts",
+      "import": "./browser.mjs",
+      "require": "./browser.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "index.js",
