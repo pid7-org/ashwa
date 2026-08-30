@@ -17,5 +17,8 @@
 **/results/
 results/
 
-
-
+# Compiled native binaries / dynamic libraries
+*.so
+*.dylib
+*.dll
+*.pyd

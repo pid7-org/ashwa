@@ -14,3 +14,9 @@ __pycache__/
 
 .mypy_cache/
 .ruff_cache/
+
+# Native shared libraries
+*.so
+*.dylib
+*.dll
+*.pyd
