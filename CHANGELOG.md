@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.5] - 2026-08-30
+
+- implement `search_three`, hardware-accelerated routine for 3-byte substring search
+  - SIMD vector backends: AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, NEON, SIMD128
+  - 64-bit and 32-bit SWAR fallback routines
+  - native Node.js (N-API), browser (WASM SIMD), and Python (CPython) bindings
+  - comprehensive test suites and throughput microbenchmarks across all ecosystems
+- bencher:
+  - add `search_three` benchmark suite and harness support
+  - standardize on stable Rust toolchain for x86_64 runners
+
 ## [0.2.4] - 2026-08-30
 
 - fix `Illegal instruction` crashes on CPUs with lesser ISA support:
