@@ -57,7 +57,8 @@ function initSync(bytesOrModule) {
     const wasmPath = join(__dirname, "./wasm/pkg/ashwa_wasm_bg.wasm");
     input = readFileSync(wasmPath);
   }
-  wasm.initSync(input);
+  const options = input ? (input.module != null ? input : { module: input }) : undefined;
+  wasm.initSync(options);
   wasmModule = wasm;
 }
 

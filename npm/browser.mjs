@@ -71,7 +71,8 @@ export function initSync(bytesOrModule) {
     input = fs.readFileSync(wasmPath);
   }
 
-  wasmInitSync(input);
+  const options = input ? (input.module != null ? input : { module: input }) : undefined;
+  wasmInitSync(options);
   isInitialized = true;
 }
 
