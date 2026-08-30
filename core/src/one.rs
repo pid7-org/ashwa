@@ -40,11 +40,10 @@ use crate::common::{get_match_index_32, match_dword, LSB32, MSB32};
 pub fn search_one(haystack: &[u8], needle: u8) -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
     match get_cpu_feature() {
-        ISA::SWAR => search_one_swar64(haystack, needle),
         ISA::AVX2 => unsafe { search_one_avx2(haystack, needle) },
         ISA::SSE2 | ISA::SSSE3 | ISA::SSE4_2 => unsafe { search_one_sse2(haystack, needle) },
         ISA::AVX512BW => unsafe { search_one_avx512(haystack, needle) },
-        _ => unreachable!(),
+        _ => search_one_swar64(haystack, needle),
     }
 
     #[cfg(target_arch = "aarch64")]
