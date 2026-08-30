@@ -2,6 +2,15 @@
 
 use core::ptr;
 
+#[cfg(target_arch = "x86_64")]
+use crate::{get_cpu_feature, ISA};
+
+#[cfg(target_arch = "x86_64")]
+use core::arch::x86_64::*;
+
+#[cfg(target_arch = "x86")]
+use core::arch::x86::*;
+
 #[cfg(target_arch = "aarch64")]
 use core::arch::aarch64::*;
 
@@ -14,9 +23,11 @@ use crate::common::search_n_swar64;
 #[cfg(any(target_pointer_width = "32", test))]
 use crate::common::search_n_swar32;
 
-#[cfg(any(target_arch = "aarch64", all(target_arch = "arm", target_feature = "neon")))]
+#[cfg(any(
+    target_arch = "aarch64",
+    all(target_arch = "arm", target_feature = "neon")
+))]
 use crate::common::clear_lowest_match_64;
-#[cfg(any(target_arch = "aarch64", all(target_arch = "arm", target_feature = "neon")))]
 use crate::{search_one, search_three, search_two};
 
 /// Searches for the first occurrence of a needle in a byte slice haystack
@@ -34,6 +45,14 @@ use crate::{search_one, search_three, search_two};
 #[inline(always)]
 #[cfg(target_pointer_width = "64")]
 pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    #[cfg(target_arch = "x86_64")]
+    match get_cpu_feature() {
+        ISA::SSE4_2 => unsafe { search_n_sse42(haystack, needle) },
+        ISA::SSSE3 => unsafe { search_n_ssse3(haystack, needle) },
+        ISA::SSE2 => unsafe { search_n_sse2(haystack, needle) },
+        _ => search_n_swar64(haystack, needle),
+    }
+
     #[cfg(target_arch = "aarch64")]
     {
         #[cfg(forced_swar_backend)]
@@ -42,7 +61,7 @@ pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         unsafe { search_n_neon(haystack, needle) }
     }
 
-    #[cfg(not(target_arch = "aarch64"))]
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     {
         search_n_swar64(haystack, needle)
     }
@@ -71,10 +90,447 @@ pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         search_n_swar32(haystack, needle)
     }
 
-    #[cfg(not(target_arch = "arm"))]
+    #[cfg(target_arch = "x86")]
+    {
+        #[cfg(target_feature = "sse4.2")]
+        return unsafe { search_n_sse42(haystack, needle) };
+
+        #[cfg(target_feature = "ssse3")]
+        return unsafe { search_n_ssse3(haystack, needle) };
+
+        #[cfg(target_feature = "sse2")]
+        return unsafe { search_n_sse2(haystack, needle) };
+
+        search_n_swar32(haystack, needle)
+    }
+
+    #[cfg(not(any(target_arch = "arm", target_arch = "x86")))]
     {
         search_n_swar32(haystack, needle)
     }
+}
+
+#[target_feature(enable = "sse2")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+unsafe fn search_n_sse2(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = _mm_set1_epi8(needle[0] as i8);
+    let v_needle_b = _mm_set1_epi8(needle[1] as i8);
+    let v_needle_c = _mm_set1_epi8(needle[n - 1] as i8);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v1_b = _mm_loadu_si128(ptr.add(i + 1) as *const __m128i);
+        let v1_c = _mm_loadu_si128(ptr.add(i + n - 1) as *const __m128i);
+
+        let v2_a = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v2_b = _mm_loadu_si128(ptr.add(i + 0x11) as *const __m128i);
+        let v2_c = _mm_loadu_si128(ptr.add(i + 0x10 + n - 1) as *const __m128i);
+
+        let v3_a = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v3_b = _mm_loadu_si128(ptr.add(i + 0x21) as *const __m128i);
+        let v3_c = _mm_loadu_si128(ptr.add(i + 0x20 + n - 1) as *const __m128i);
+
+        let v4_a = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+        let v4_b = _mm_loadu_si128(ptr.add(i + 0x31) as *const __m128i);
+        let v4_c = _mm_loadu_si128(ptr.add(i + 0x30 + n - 1) as *const __m128i);
+
+        let eq1 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v1_a, v_needle_a), _mm_cmpeq_epi8(v1_b, v_needle_b)),
+            _mm_cmpeq_epi8(v1_c, v_needle_c),
+        );
+        let eq2 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v2_a, v_needle_a), _mm_cmpeq_epi8(v2_b, v_needle_b)),
+            _mm_cmpeq_epi8(v2_c, v_needle_c),
+        );
+        let eq3 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v3_a, v_needle_a), _mm_cmpeq_epi8(v3_b, v_needle_b)),
+            _mm_cmpeq_epi8(v3_c, v_needle_c),
+        );
+        let eq4 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v4_a, v_needle_a), _mm_cmpeq_epi8(v4_b, v_needle_b)),
+            _mm_cmpeq_epi8(v4_c, v_needle_c),
+        );
+
+        let or1 = _mm_or_si128(eq1, eq2);
+        let or2 = _mm_or_si128(eq3, eq4);
+        let or_vec = _mm_or_si128(or1, or2);
+
+        if _mm_movemask_epi8(or_vec) != 0 {
+            let mut m1 = _mm_movemask_epi8(eq1) as u32;
+            while m1 != 0 {
+                let offset = m1.trailing_zeros() as usize;
+                let cand = i + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m1 &= m1 - 1;
+            }
+
+            let mut m2 = _mm_movemask_epi8(eq2) as u32;
+            while m2 != 0 {
+                let offset = m2.trailing_zeros() as usize;
+                let cand = i + 0x10 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m2 &= m2 - 1;
+            }
+
+            let mut m3 = _mm_movemask_epi8(eq3) as u32;
+            while m3 != 0 {
+                let offset = m3.trailing_zeros() as usize;
+                let cand = i + 0x20 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m3 &= m3 - 1;
+            }
+
+            let mut m4 = _mm_movemask_epi8(eq4) as u32;
+            while m4 != 0 {
+                let offset = m4.trailing_zeros() as usize;
+                let cand = i + 0x30 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m4 &= m4 - 1;
+            }
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 + n - 1 <= len {
+        let v_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v_b = _mm_loadu_si128(ptr.add(i + 1) as *const __m128i);
+        let v_c = _mm_loadu_si128(ptr.add(i + n - 1) as *const __m128i);
+
+        let eq = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v_a, v_needle_a), _mm_cmpeq_epi8(v_b, v_needle_b)),
+            _mm_cmpeq_epi8(v_c, v_needle_c),
+        );
+        let mut m = _mm_movemask_epi8(eq) as u32;
+
+        while m != 0 {
+            let offset = m.trailing_zeros() as usize;
+            let cand = i + offset;
+            if &haystack[cand..cand + n] == needle {
+                return Some(cand);
+            }
+            m &= m - 1;
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
+#[target_feature(enable = "ssse3")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+unsafe fn search_n_ssse3(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = _mm_set1_epi8(needle[0] as i8);
+    let v_needle_b = _mm_set1_epi8(needle[1] as i8);
+    let v_needle_c = _mm_set1_epi8(needle[n - 1] as i8);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v2 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v3 = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v4 = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+        let v5 = _mm_loadu_si128(ptr.add(i + 0x40) as *const __m128i);
+
+        let v1_b = _mm_alignr_epi8(v2, v1, 1);
+        let v2_b = _mm_alignr_epi8(v3, v2, 1);
+        let v3_b = _mm_alignr_epi8(v4, v3, 1);
+        let v4_b = _mm_alignr_epi8(v5, v4, 1);
+
+        let v1_c = _mm_loadu_si128(ptr.add(i + n - 1) as *const __m128i);
+        let v2_c = _mm_loadu_si128(ptr.add(i + 0x10 + n - 1) as *const __m128i);
+        let v3_c = _mm_loadu_si128(ptr.add(i + 0x20 + n - 1) as *const __m128i);
+        let v4_c = _mm_loadu_si128(ptr.add(i + 0x30 + n - 1) as *const __m128i);
+
+        let eq1 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v1, v_needle_a), _mm_cmpeq_epi8(v1_b, v_needle_b)),
+            _mm_cmpeq_epi8(v1_c, v_needle_c),
+        );
+        let eq2 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v2, v_needle_a), _mm_cmpeq_epi8(v2_b, v_needle_b)),
+            _mm_cmpeq_epi8(v2_c, v_needle_c),
+        );
+        let eq3 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v3, v_needle_a), _mm_cmpeq_epi8(v3_b, v_needle_b)),
+            _mm_cmpeq_epi8(v3_c, v_needle_c),
+        );
+        let eq4 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v4, v_needle_a), _mm_cmpeq_epi8(v4_b, v_needle_b)),
+            _mm_cmpeq_epi8(v4_c, v_needle_c),
+        );
+
+        let or1 = _mm_or_si128(eq1, eq2);
+        let or2 = _mm_or_si128(eq3, eq4);
+        let or_vec = _mm_or_si128(or1, or2);
+
+        if _mm_movemask_epi8(or_vec) != 0 {
+            let mut m1 = _mm_movemask_epi8(eq1) as u32;
+            while m1 != 0 {
+                let offset = m1.trailing_zeros() as usize;
+                let cand = i + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m1 &= m1 - 1;
+            }
+
+            let mut m2 = _mm_movemask_epi8(eq2) as u32;
+            while m2 != 0 {
+                let offset = m2.trailing_zeros() as usize;
+                let cand = i + 0x10 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m2 &= m2 - 1;
+            }
+
+            let mut m3 = _mm_movemask_epi8(eq3) as u32;
+            while m3 != 0 {
+                let offset = m3.trailing_zeros() as usize;
+                let cand = i + 0x20 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m3 &= m3 - 1;
+            }
+
+            let mut m4 = _mm_movemask_epi8(eq4) as u32;
+            while m4 != 0 {
+                let offset = m4.trailing_zeros() as usize;
+                let cand = i + 0x30 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m4 &= m4 - 1;
+            }
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 + n - 1 <= len {
+        let v_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v_b = _mm_loadu_si128(ptr.add(i + 1) as *const __m128i);
+        let v_c = _mm_loadu_si128(ptr.add(i + n - 1) as *const __m128i);
+
+        let eq = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v_a, v_needle_a), _mm_cmpeq_epi8(v_b, v_needle_b)),
+            _mm_cmpeq_epi8(v_c, v_needle_c),
+        );
+        let mut m = _mm_movemask_epi8(eq) as u32;
+
+        while m != 0 {
+            let offset = m.trailing_zeros() as usize;
+            let cand = i + offset;
+            if &haystack[cand..cand + n] == needle {
+                return Some(cand);
+            }
+            m &= m - 1;
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
+#[target_feature(enable = "sse4.2")]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+unsafe fn search_n_sse42(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = _mm_set1_epi8(needle[0] as i8);
+    let v_needle_b = _mm_set1_epi8(needle[1] as i8);
+    let v_needle_c = _mm_set1_epi8(needle[n - 1] as i8);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v2 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v3 = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v4 = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+        let v5 = _mm_loadu_si128(ptr.add(i + 0x40) as *const __m128i);
+
+        let v1_b = _mm_alignr_epi8(v2, v1, 1);
+        let v2_b = _mm_alignr_epi8(v3, v2, 1);
+        let v3_b = _mm_alignr_epi8(v4, v3, 1);
+        let v4_b = _mm_alignr_epi8(v5, v4, 1);
+
+        let v1_c = _mm_loadu_si128(ptr.add(i + n - 1) as *const __m128i);
+        let v2_c = _mm_loadu_si128(ptr.add(i + 0x10 + n - 1) as *const __m128i);
+        let v3_c = _mm_loadu_si128(ptr.add(i + 0x20 + n - 1) as *const __m128i);
+        let v4_c = _mm_loadu_si128(ptr.add(i + 0x30 + n - 1) as *const __m128i);
+
+        let eq1 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v1, v_needle_a), _mm_cmpeq_epi8(v1_b, v_needle_b)),
+            _mm_cmpeq_epi8(v1_c, v_needle_c),
+        );
+        let eq2 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v2, v_needle_a), _mm_cmpeq_epi8(v2_b, v_needle_b)),
+            _mm_cmpeq_epi8(v2_c, v_needle_c),
+        );
+        let eq3 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v3, v_needle_a), _mm_cmpeq_epi8(v3_b, v_needle_b)),
+            _mm_cmpeq_epi8(v3_c, v_needle_c),
+        );
+        let eq4 = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v4, v_needle_a), _mm_cmpeq_epi8(v4_b, v_needle_b)),
+            _mm_cmpeq_epi8(v4_c, v_needle_c),
+        );
+
+        let or1 = _mm_or_si128(eq1, eq2);
+        let or2 = _mm_or_si128(eq3, eq4);
+        let or_vec = _mm_or_si128(or1, or2);
+
+        if _mm_testz_si128(or_vec, or_vec) == 0 {
+            let mut m1 = _mm_movemask_epi8(eq1) as u32;
+            while m1 != 0 {
+                let offset = m1.trailing_zeros() as usize;
+                let cand = i + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m1 &= m1 - 1;
+            }
+
+            let mut m2 = _mm_movemask_epi8(eq2) as u32;
+            while m2 != 0 {
+                let offset = m2.trailing_zeros() as usize;
+                let cand = i + 0x10 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m2 &= m2 - 1;
+            }
+
+            let mut m3 = _mm_movemask_epi8(eq3) as u32;
+            while m3 != 0 {
+                let offset = m3.trailing_zeros() as usize;
+                let cand = i + 0x20 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m3 &= m3 - 1;
+            }
+
+            let mut m4 = _mm_movemask_epi8(eq4) as u32;
+            while m4 != 0 {
+                let offset = m4.trailing_zeros() as usize;
+                let cand = i + 0x30 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m4 &= m4 - 1;
+            }
+        }
+
+        i += 0x40;
+    }
+
+    while i + 0x10 + n - 1 <= len {
+        let v_a = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v_b = _mm_loadu_si128(ptr.add(i + 1) as *const __m128i);
+        let v_c = _mm_loadu_si128(ptr.add(i + n - 1) as *const __m128i);
+
+        let eq = _mm_and_si128(
+            _mm_and_si128(_mm_cmpeq_epi8(v_a, v_needle_a), _mm_cmpeq_epi8(v_b, v_needle_b)),
+            _mm_cmpeq_epi8(v_c, v_needle_c),
+        );
+        let mut m = _mm_movemask_epi8(eq) as u32;
+
+        while m != 0 {
+            let offset = m.trailing_zeros() as usize;
+            let cand = i + offset;
+            if &haystack[cand..cand + n] == needle {
+                return Some(cand);
+            }
+            m &= m - 1;
+        }
+
+        i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
 }
 
 #[inline(always)]
@@ -621,6 +1077,30 @@ mod tests {
                     expected, actual, h_len, n_len, alphabet_size
                 );
             }
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    fn test_sse2_directly() {
+        if std::is_x86_feature_detected!("sse2") {
+            run_standard_suite(|h, n| unsafe { search_n_sse2(h, n) });
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    fn test_ssse3_directly() {
+        if std::is_x86_feature_detected!("ssse3") {
+            run_standard_suite(|h, n| unsafe { search_n_ssse3(h, n) });
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    fn test_sse42_directly() {
+        if std::is_x86_feature_detected!("sse4.2") {
+            run_standard_suite(|h, n| unsafe { search_n_sse42(h, n) });
         }
     }
 
