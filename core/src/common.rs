@@ -1,5 +1,3 @@
-//! Common SWAR constants and helper routines for multi-platform SIMD/SWAR search
-
 #[cfg(any(target_pointer_width = "64", test))]
 pub(crate) const LSB64: u64 = 0x0101_0101_0101_0101;
 
