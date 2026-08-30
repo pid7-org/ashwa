@@ -47,6 +47,8 @@ use crate::{search_one, search_three, search_two};
 pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     #[cfg(target_arch = "x86_64")]
     match get_cpu_feature() {
+        ISA::AVX512BW => unsafe { search_n_avx512(haystack, needle) },
+        ISA::AVX2 => unsafe { search_n_avx2(haystack, needle) },
         ISA::SSE4_2 => unsafe { search_n_sse42(haystack, needle) },
         ISA::SSSE3 => unsafe { search_n_ssse3(haystack, needle) },
         ISA::SSE2 => unsafe { search_n_sse2(haystack, needle) },
@@ -528,6 +530,213 @@ unsafe fn search_n_sse42(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         }
 
         i += 0x10;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn search_n_avx2(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = _mm256_set1_epi8(needle[0] as i8);
+    let v_needle_b = _mm256_set1_epi8(needle[1] as i8);
+    let v_needle_c = _mm256_set1_epi8(needle[n - 1] as i8);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x40 + n - 1 <= len {
+        let v1_a = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v1_b = _mm256_loadu_si256(ptr.add(i + 1) as *const __m256i);
+        let v1_c = _mm256_loadu_si256(ptr.add(i + n - 1) as *const __m256i);
+
+        let v2_a = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+        let v2_b = _mm256_loadu_si256(ptr.add(i + 0x21) as *const __m256i);
+        let v2_c = _mm256_loadu_si256(ptr.add(i + 0x20 + n - 1) as *const __m256i);
+
+        let eq1 = _mm256_and_si256(
+            _mm256_and_si256(
+                _mm256_cmpeq_epi8(v1_a, v_needle_a),
+                _mm256_cmpeq_epi8(v1_b, v_needle_b),
+            ),
+            _mm256_cmpeq_epi8(v1_c, v_needle_c),
+        );
+        let eq2 = _mm256_and_si256(
+            _mm256_and_si256(
+                _mm256_cmpeq_epi8(v2_a, v_needle_a),
+                _mm256_cmpeq_epi8(v2_b, v_needle_b),
+            ),
+            _mm256_cmpeq_epi8(v2_c, v_needle_c),
+        );
+
+        let or_vec = _mm256_or_si256(eq1, eq2);
+        if _mm256_movemask_epi8(or_vec) != 0 {
+            let mut m1 = _mm256_movemask_epi8(eq1) as u32;
+            while m1 != 0 {
+                let offset = m1.trailing_zeros() as usize;
+                let cand = i + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m1 &= m1 - 1;
+            }
+
+            let mut m2 = _mm256_movemask_epi8(eq2) as u32;
+            while m2 != 0 {
+                let offset = m2.trailing_zeros() as usize;
+                let cand = i + 0x20 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                m2 &= m2 - 1;
+            }
+        }
+
+        i += 0x40;
+    }
+
+    if i + 0x20 + n - 1 <= len {
+        let v_a = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v_b = _mm256_loadu_si256(ptr.add(i + 1) as *const __m256i);
+        let v_c = _mm256_loadu_si256(ptr.add(i + n - 1) as *const __m256i);
+
+        let eq = _mm256_and_si256(
+            _mm256_and_si256(
+                _mm256_cmpeq_epi8(v_a, v_needle_a),
+                _mm256_cmpeq_epi8(v_b, v_needle_b),
+            ),
+            _mm256_cmpeq_epi8(v_c, v_needle_c),
+        );
+
+        let mut m = _mm256_movemask_epi8(eq) as u32;
+        while m != 0 {
+            let offset = m.trailing_zeros() as usize;
+            let cand = i + offset;
+            if &haystack[cand..cand + n] == needle {
+                return Some(cand);
+            }
+            m &= m - 1;
+        }
+
+        i += 0x20;
+    }
+
+    haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx512bw")]
+unsafe fn search_n_avx512(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    let n = needle.len();
+    if n == 0 {
+        return Some(0);
+    }
+
+    if n > haystack.len() {
+        return None;
+    }
+
+    if n == 1 {
+        return search_one(haystack, needle[0]);
+    }
+
+    if n == 2 {
+        return search_two(haystack, [needle[0], needle[1]]);
+    }
+
+    if n == 3 {
+        return search_three(haystack, [needle[0], needle[1], needle[2]]);
+    }
+
+    let v_needle_a = _mm512_set1_epi8(needle[0] as i8);
+    let v_needle_b = _mm512_set1_epi8(needle[1] as i8);
+    let v_needle_c = _mm512_set1_epi8(needle[n - 1] as i8);
+
+    let len = haystack.len();
+    let ptr = haystack.as_ptr();
+
+    let mut i = 0;
+    while i + 0x80 + n - 1 <= len {
+        let v1_a = _mm512_loadu_si512(ptr.add(i) as *const _);
+        let v1_b = _mm512_loadu_si512(ptr.add(i + 1) as *const _);
+        let v1_c = _mm512_loadu_si512(ptr.add(i + n - 1) as *const _);
+
+        let v2_a = _mm512_loadu_si512(ptr.add(i + 0x40) as *const _);
+        let v2_b = _mm512_loadu_si512(ptr.add(i + 0x41) as *const _);
+        let v2_c = _mm512_loadu_si512(ptr.add(i + 0x40 + n - 1) as *const _);
+
+        let mut eq1 = _mm512_cmpeq_epi8_mask(v1_a, v_needle_a)
+            & _mm512_cmpeq_epi8_mask(v1_b, v_needle_b)
+            & _mm512_cmpeq_epi8_mask(v1_c, v_needle_c);
+
+        let mut eq2 = _mm512_cmpeq_epi8_mask(v2_a, v_needle_a)
+            & _mm512_cmpeq_epi8_mask(v2_b, v_needle_b)
+            & _mm512_cmpeq_epi8_mask(v2_c, v_needle_c);
+
+        if (eq1 | eq2) != 0 {
+            while eq1 != 0 {
+                let offset = eq1.trailing_zeros() as usize;
+                let cand = i + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                eq1 &= eq1 - 1;
+            }
+
+            while eq2 != 0 {
+                let offset = eq2.trailing_zeros() as usize;
+                let cand = i + 0x40 + offset;
+                if &haystack[cand..cand + n] == needle {
+                    return Some(cand);
+                }
+                eq2 &= eq2 - 1;
+            }
+        }
+
+        i += 0x80;
+    }
+
+    if i + 0x40 + n - 1 <= len {
+        let v_a = _mm512_loadu_si512(ptr.add(i) as *const _);
+        let v_b = _mm512_loadu_si512(ptr.add(i + 1) as *const _);
+        let v_c = _mm512_loadu_si512(ptr.add(i + n - 1) as *const _);
+
+        let mut eq = _mm512_cmpeq_epi8_mask(v_a, v_needle_a)
+            & _mm512_cmpeq_epi8_mask(v_b, v_needle_b)
+            & _mm512_cmpeq_epi8_mask(v_c, v_needle_c);
+
+        while eq != 0 {
+            let offset = eq.trailing_zeros() as usize;
+            let cand = i + offset;
+            if &haystack[cand..cand + n] == needle {
+                return Some(cand);
+            }
+            eq &= eq - 1;
+        }
+
+        i += 0x40;
     }
 
     haystack[i..].windows(n).position(|w| w == needle).map(|pos| pos + i)
@@ -1101,6 +1310,22 @@ mod tests {
     fn test_sse42_directly() {
         if std::is_x86_feature_detected!("sse4.2") {
             run_standard_suite(|h, n| unsafe { search_n_sse42(h, n) });
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    fn test_avx2_directly() {
+        if std::is_x86_feature_detected!("avx2") {
+            run_standard_suite(|h, n| unsafe { search_n_avx2(h, n) });
+        }
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn test_avx512_directly() {
+        if std::is_x86_feature_detected!("avx512bw") {
+            run_standard_suite(|h, n| unsafe { search_n_avx512(h, n) });
         }
     }
 
