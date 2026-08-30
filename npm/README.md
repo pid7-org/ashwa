@@ -16,7 +16,6 @@ Hardware accelerated routines for single substring search
 ## Index
 
 - [Supported Platforms](#supported-platforms)
-- [`AVX512` Support](#avx512-support)
 - [Installation](#installation)
 - [Usage](#usage)
   - [Node](#node)
@@ -38,13 +37,6 @@ Hardware accelerated routines for single substring search
 | x86_64          | Linux, macOS, Windows                  | AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2 | 64-bit SWAR |
 | AArch64 (ARM64) | Apple Silicon, Linux ARM64             | 128-bit ARM NEON                     | 64-bit SWAR |
 | WebAssembly     | Browsers, WebWorkers, Node.js (wasm32) | WASM SIMD128 (`simd128`)             | 32-bit SWAR |
-
-## `AVX512` Support
-
-> ℹ️ NOTE:
-> On x86_64 machines where the `AVX512BW` ISA is supported by the CPU, `ashwa` automatically detects and uses
-> the ISA for hardware acceleration at runtime. Unlike Rust, no nightly toolchain, compile-time flags, or extra
-> setup are required.
 
 ## Installation
 
@@ -160,13 +152,13 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 >
 > * x86_64 (_x64_)
 >   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
->   * ISA: _AVX-512BW_ (`+nightly`) · _WASM SIMD128_ (stable)
+>   * ISA: _AVX-512BW_ · _WASM SIMD128_
 >   * Cache: L1d: 384 KiB · L1i: 256 KiB · L2: 16 MiB · L3: 105 MiB
 >   * STREAM Triad: 25.76 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
->   * ISA: _NEON_ (stable)
+>   * ISA: _NEON_
 >   * Cache: L1d: 1 MiB · L1i: 1 MiB · L2: 16 MiB · L3: 32 MiB
 >   * STREAM Triad: 75.48 GiB/s
 
