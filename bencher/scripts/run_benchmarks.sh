@@ -127,12 +127,6 @@ if [ "$ARCH_UNAME" = "x86_64" ] && grep -q "\bavx512bw\b" /proc/cpuinfo 2>/dev/n
     HAS_AVX512BW=true
     HIGHEST_ISA="AVX-512BW (512-bit SIMD)"
     TARGET_FLAG="-C target-cpu=native -C target-feature=+avx512bw,+avx512f"
-
-    if command -v rustup >/dev/null 2>&1 && rustup toolchain list 2>/dev/null | grep -q nightly; then
-        CARGO_CMD="cargo +nightly"
-    elif cargo +nightly --version >/dev/null 2>&1; then
-        CARGO_CMD="cargo +nightly"
-    fi
 elif grep -q "\bavx2\b" /proc/cpuinfo 2>/dev/null; then
     HIGHEST_ISA="AVX2 (256-bit SIMD)"
     TARGET_FLAG="-C target-cpu=native"

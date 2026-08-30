@@ -349,9 +349,6 @@ run_single_benchmark() {
     local arch_results_dir="${RESULTS_DIR}/${arch}"
     local log_prefix="[$arch]"
     local toolchain_type="stable"
-    if [ "$arch" = "x86_64" ] || [ "$arch" = "amd64" ] || [ "$arch" = "x64" ]; then
-        toolchain_type="nightly"
-    fi
 
     log() {
         echo "$log_prefix $*"
