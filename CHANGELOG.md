@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.0] - 2026-08-31
+
+- Initial stable release.
+
 ## [0.2.6] - 2026-08-31
 
 - implement `search_n`, hardware-accelerated routine for arbitrary-length ($N$) substring search
