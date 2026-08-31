@@ -32,6 +32,7 @@ Hardware accelerated routines for single substring search
   - [`searchOne`](#searchone-1)
   - [`searchTwo`](#searchtwo-1)
   - [`searchThree`](#searchthree-1)
+  - [`searchN`](#searchn-where-n--8)
 
 ## Supported Platforms
 
@@ -187,6 +188,7 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 - [`searchOne`](#searchone-1)
 - [`searchTwo`](#searchtwo-1)
 - [`searchThree`](#searchthree-1)
+- [`searchN`](#searchn-where-n--8)
 
 > Benchmarks are evaluated across dedicated AWS EC2 hardware environments on Node.js `v22.23.2`,
 >
@@ -273,3 +275,27 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 | RAM        | 256 MiB   | 54.99 ms      | 4.55 GiB/s       |
 | RAM        | 512 MiB   | 114.54 ms     | 4.37 GiB/s       |
 | RAM        | 1 GiB     | 227.27 ms     | 4.40 GiB/s       |
+
+### `searchN` (where N = 8)
+
+#### Native Node.js (V8 N-API)
+
+| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
+|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
+| L1 Cache   | 32 KiB    | 940.14 ns     | 2.62 µs         | 32.46 GiB/s      | 11.63 GiB/s        |
+| L2 Cache   | 512 KiB   | 15.53 µs      | 38.68 µs        | 31.44 GiB/s      | 12.62 GiB/s        |
+| L3 Cache   | 16 MiB    | 590.67 µs     | 1.23 ms         | 26.45 GiB/s      | 12.69 GiB/s        |
+| RAM        | 256 MiB   | 21.28 ms      | 19.64 ms        | 11.75 GiB/s      | 12.73 GiB/s        |
+| RAM        | 512 MiB   | 44.52 ms      | 39.02 ms        | 11.23 GiB/s      | 12.82 GiB/s        |
+| RAM        | 1 GiB     | 89.46 ms      | 78.20 ms        | 11.18 GiB/s      | 12.79 GiB/s        |
+
+#### WebAssembly (WASM SIMD128)
+
+| Level      | Payload   | Latency (x64) | Throughput (x64) |
+|:-----------|:----------|:--------------|:-----------------|
+| L1 Cache   | 32 KiB    | 2.64 µs       | 11.54 GiB/s      |
+| L2 Cache   | 512 KiB   | 39.46 µs      | 12.37 GiB/s      |
+| L3 Cache   | 16 MiB    | 2.00 ms       | 7.82 GiB/s       |
+| RAM        | 256 MiB   | 56.92 ms      | 4.39 GiB/s       |
+| RAM        | 512 MiB   | 114.60 ms     | 4.36 GiB/s       |
+| RAM        | 1 GiB     | 228.40 ms     | 4.38 GiB/s       |
