@@ -20,8 +20,13 @@ Examples::
     print(ashwa.search_three(haystack, b"qui"))   # 4
     print(ashwa.search_three(haystack, b"fox"))   # 16
     print(ashwa.search_three(haystack, b"!!!"))   # None
+
+    # Search for an arbitrary byte sequence
+    print(ashwa.search_n(haystack, b"quick"))     # 4
+    print(ashwa.search_n(haystack, b"brown fox")) # 10
+    print(ashwa.search_n(haystack, b"!!!"))       # None
 """
 
-from .ashwa import search_one, search_two, search_three, __version__
+from .ashwa import search_one, search_two, search_three, search_n, __version__
 
-__all__ = ["search_one", "search_two", "search_three", "__version__"]
+__all__ = ["search_one", "search_two", "search_three", "search_n", "__version__"]

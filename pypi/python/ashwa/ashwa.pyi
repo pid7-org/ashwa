@@ -100,3 +100,37 @@ def search_three(
     """
     ...
 
+def search_n(
+    haystack: bytes | bytearray | memoryview,
+    needle: bytes | bytearray | memoryview | tuple[int, ...] | list[int] | Sequence[int],
+) -> Optional[int]:
+    """
+    Search for the first occurrence of an arbitrary byte sequence ``needle`` in ``haystack``
+
+    Uses the best available SIMD instruction set on the host CPU
+    (AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON) otherwise falls back to SWAR.
+
+    Args:
+        haystack: A bytes-like object to search in.
+        needle:   A byte sequence (e.g. ``b"quick"``, ``(97, 98, 99)``, ``[97, 98, 99]``,
+                  or a ``bytearray``/``memoryview``) to locate.
+
+    Returns:
+        The 0-based byte index of the first occurrence of *needle*,
+        or ``None`` if not found.
+
+    Examples:
+        >>> import ashwa
+        >>> ashwa.search_n(b"Hello, World!", b"World")
+        7
+        >>> ashwa.search_n(b"Hello, World!", [ord("W"), ord("o"), ord("r"), ord("l"), ord("d")])
+        7
+        >>> ashwa.search_n(b"Hello, World!", b"zzz") is None
+        True
+        >>> ashwa.search_n(b"He", b"Hello") is None
+        True
+        >>> ashwa.search_n(b"", b"") == 0
+        True
+    """
+    ...
+
