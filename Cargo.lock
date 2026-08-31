@@ -4,11 +4,11 @@ version = 4
 
 [[package]]
 name = "ashwa"
-version = "1.0.0"
+version = "1.0.1"
 
 [[package]]
 name = "ashwa_node"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "ashwa",
  "napi",
@@ -18,7 +18,7 @@ dependencies = [
 
 [[package]]
 name = "ashwa_python"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "ashwa",
  "pyo3",
@@ -26,7 +26,7 @@ dependencies = [
 
 [[package]]
 name = "ashwa_wasm"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "ashwa",
  "wasm-bindgen",
