@@ -26,6 +26,7 @@ Hardware accelerated routines for single substring search
   - [`search_one`](#search_one-1)
   - [`search_two`](#search_two-1)
   - [`search_three`](#search_three-1)
+  - [`search_n`](#search_n-where-n--8)
 
 ## Supported Platforms
 
@@ -123,6 +124,7 @@ Searches for the first occurrence of an arbitrary byte sequence `needle` within 
 - [`search_one`](#search_one-1)
 - [`search_two`](#search_two-1)
 - [`search_three`](#search_three-1)
+- [`search_n`](#search_n-where-n--8)
 
 > Benchmarks are evaluated across dedicated AWS EC2 hardware environments on Python `3.12.3`,
 >
@@ -170,3 +172,14 @@ Searches for the first occurrence of an arbitrary byte sequence `needle` within 
 | RAM        | 256 MiB   | 19.33 ms      | 17.92 ms        | 12.93 GiB/s      | 13.95 GiB/s        |
 | RAM        | 512 MiB   | 41.46 ms      | 35.87 ms        | 12.06 GiB/s      | 13.94 GiB/s        |
 | RAM        | 1 GiB     | 87.15 ms      | 71.73 ms        | 11.47 GiB/s      | 13.94 GiB/s        |
+
+### `search_n` (where N = 8)
+
+| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
+|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
+| L1 Cache   | 32 KiB    | 866.21 ns     | 2.57 µs         | 35.23 GiB/s      | 11.86 GiB/s        |
+| L2 Cache   | 512 KiB   | 12.74 µs      | 38.31 µs        | 38.32 GiB/s      | 12.75 GiB/s        |
+| L3 Cache   | 16 MiB    | 558.41 µs     | 1.23 ms         | 27.98 GiB/s      | 12.65 GiB/s        |
+| RAM        | 256 MiB   | 21.19 ms      | 19.53 ms        | 11.80 GiB/s      | 12.80 GiB/s        |
+| RAM        | 512 MiB   | 43.95 ms      | 39.12 ms        | 11.38 GiB/s      | 12.78 GiB/s        |
+| RAM        | 1 GiB     | 88.85 ms      | 78.08 ms        | 11.26 GiB/s      | 12.81 GiB/s        |
