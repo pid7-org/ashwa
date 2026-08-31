@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0] - 2026-08-31
+## [0.2.6] - 2026-08-31
 
 - implement `search_n`, hardware-accelerated routine for arbitrary-length ($N$) substring search
   - SIMD vector backends: AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON, WASM SIMD128
