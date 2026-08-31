@@ -70,13 +70,22 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 >   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
 >   * ISA: _AVX512BW_
 >   * Cache: L1d: 384 KiB · L2: 16 MiB · L3: 105 MiB
->   * STREAM Triad: 25.76 GiB/s
+>   * STREAM Triad (Read + Write): 25.76 GiB/s
+>   * Max Single-Core Read Bandwidth: ~12.5 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
 >   * ISA: _NEON_
 >   * Cache: L1d: 1 MiB · L2: 16 MiB · L3: 32 MiB
->   * STREAM Triad: 75.48 GiB/s
+>   * STREAM Triad (Read + Write): 75.48 GiB/s
+>   * Max Single-Core Read Bandwidth: ~25.5 GiB/s
+
+> [!NOTE]
+>
+> All benchmarks execute while pinned to a single physical core (mostly to 0th core). For out-of-cache RAM-bound
+> payloads (>256 MiB), every search routine fully saturates the hardwares maximum single-core memory bandwidth
+> ceiling (~12 GiB/s on x64, ~25 GiB/s on arm64). Execution is 100% memory-bandwidth bound rather than
+> compute-bound searching data as fast as the physical memory bus can deliver bytes into the CPU registers.
 
 ### `search_one`
 
@@ -111,7 +120,7 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 | RAM        | 512 MiB   | 41.13 ms      | 35.96 ms        | 12.16 GiB/s      | 13.91 GiB/s        |
 | RAM        | 1 GiB     | 87.32 ms      | 71.86 ms        | 11.45 GiB/s      | 13.92 GiB/s        |
 
-### `search_n` (where N = 8)
+### `search_n` (where `len(N) = 8`)
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
 |:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
