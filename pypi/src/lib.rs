@@ -2,6 +2,7 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyBufferError;
 use pyo3::prelude::*;
 
+/// Search for the first occurrence of a single byte `needle` (0-255) in `haystack`.
 #[pyfunction]
 fn search_one(py: Python<'_>, haystack: &Bound<'_, PyAny>, needle: u8) -> PyResult<Option<usize>> {
     let buf = PyBuffer::<u8>::get(haystack)?;
@@ -15,6 +16,7 @@ fn search_one(py: Python<'_>, haystack: &Bound<'_, PyAny>, needle: u8) -> PyResu
     Ok(::ashwa::search_one(bytes, needle))
 }
 
+/// Search for the first occurrence of a two-byte `needle` in `haystack`.
 #[pyfunction]
 fn search_two(
     py: Python<'_>,
@@ -32,6 +34,7 @@ fn search_two(
     Ok(::ashwa::search_two(bytes, needle))
 }
 
+/// Search for the first occurrence of a three-byte `needle` in `haystack`.
 #[pyfunction]
 fn search_three(
     py: Python<'_>,
@@ -49,6 +52,7 @@ fn search_three(
     Ok(::ashwa::search_three(bytes, needle))
 }
 
+/// Search for the first occurrence of an arbitrary byte sequence `needle` in `haystack`.
 #[pyfunction]
 fn search_n(
     py: Python<'_>,
