@@ -19,6 +19,7 @@ Hardware accelerated routines for single substring search
   - [`search_one`](#search_one)
   - [`search_two`](#search_two)
   - [`search_three`](#search_three)
+  - [`search_n`](#search_n)
 
 ## Language Ecosystems
 
@@ -60,6 +61,7 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 - [`search_one`](#search_one)
 - [`search_two`](#search_two)
 - [`search_three`](#search_three)
+- [`search_n`](#search_n)
 
 > [!NOTE]
 > Benchmarks are evaluated across dedicated AWS EC2 hardware environments,
@@ -108,4 +110,15 @@ Refer to [docs.rs](https://docs.rs/ashwa/latest/ashwa/) for the complete crate d
 | RAM        | 256 MiB   | 20.33 ms      | 17.92 ms        | 12.30 GiB/s      | 13.95 GiB/s        |
 | RAM        | 512 MiB   | 41.13 ms      | 35.96 ms        | 12.16 GiB/s      | 13.91 GiB/s        |
 | RAM        | 1 GiB     | 87.32 ms      | 71.86 ms        | 11.45 GiB/s      | 13.92 GiB/s        |
+
+### `search_n` (where N = 8)
+
+| Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
+|:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
+| L1 Cache   | 32 KiB    | 706.40 ns     | 2.47 µs         | 43.20 GiB/s      | 12.37 GiB/s        |
+| L2 Cache   | 512 KiB   | 11.51 µs      | 37.63 µs        | 42.43 GiB/s      | 12.98 GiB/s        |
+| L3 Cache   | 16 MiB    | 532.58 µs     | 1.22 ms         | 29.34 GiB/s      | 12.79 GiB/s        |
+| RAM        | 256 MiB   | 20.28 ms      | 19.24 ms        | 12.33 GiB/s      | 12.99 GiB/s        |
+| RAM        | 512 MiB   | 43.17 ms      | 38.46 ms        | 11.58 GiB/s      | 13.00 GiB/s        |
+| RAM        | 1 GiB     | 87.43 ms      | 76.88 ms        | 11.44 GiB/s      | 13.01 GiB/s        |
 
