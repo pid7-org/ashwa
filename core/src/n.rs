@@ -26,10 +26,7 @@ use crate::common::search_n_swar64;
 #[cfg(any(target_pointer_width = "32", test))]
 use crate::common::search_n_swar32;
 
-#[cfg(any(
-    target_arch = "aarch64",
-    all(target_arch = "arm", target_feature = "neon")
-))]
+#[cfg(any(target_arch = "aarch64", all(target_arch = "arm", target_feature = "neon")))]
 use crate::common::clear_lowest_match_64;
 use crate::{search_one, search_three, search_two};
 

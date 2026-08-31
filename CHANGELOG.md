@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.0] - 2026-08-31
+
+- implement `search_n`, hardware-accelerated routine for arbitrary-length ($N$) substring search
+  - SIMD vector backends: AVX-512BW, AVX2, SSE4.2, SSSE3, SSE2, ARM NEON, WASM SIMD128
+  - 64-bit and 32-bit SWAR fallback routines
+  - native Node.js (N-API), browser (WASM SIMD), and Python (CPython) bindings
+  - comprehensive test suites, throughput benchmarks, and ILP profiling across all ecosystems
+- bencher:
+  - add `search_n` benchmark suite and hardware profiling support
+- docs:
+  - add `search_n` benchmark tables across core, npm, and PyPI READMEs
+  - document single-core DRAM bandwidth saturation limits and memory-bound throughput characteristics
+
 ## [0.2.5] - 2026-08-30
 
 - implement `search_three`, hardware-accelerated routine for 3-byte substring search
