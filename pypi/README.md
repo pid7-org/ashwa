@@ -21,6 +21,7 @@ Hardware accelerated routines for single substring search
   - [`search_one`](#search_one)
   - [`search_two`](#search_two)
   - [`search_three`](#search_three)
+  - [`search_n`](#search_n)
 - [Benchmarks](#benchmarks)
   - [`search_one`](#search_one-1)
   - [`search_two`](#search_two-1)
@@ -96,6 +97,24 @@ Searches for the first occurrence of a three-byte `needle` within `haystack`.
 - Parameters:
   - `haystack`: `bytes | bytearray | memoryview` — The bytes-like object to search in.
   - `needle`: `bytes | bytearray | memoryview | tuple[int, int, int] | list[int] | Sequence[int]` — A 3-byte sequence to locate.
+- Returns:
+  - The 0-based byte index (`int`) of the first occurrence of `needle`, or `None` if not found.
+
+### `search_n(haystack, needle)`
+
+```py
+def search_n(
+    haystack: bytes | bytearray | memoryview,
+    needle: bytes | bytearray | memoryview | tuple[int, ...] | list[int] | Sequence[int],
+) -> int | None:
+    ...
+```
+
+Searches for the first occurrence of an arbitrary byte sequence `needle` within `haystack`.
+
+- Parameters:
+  - `haystack`: `bytes | bytearray | memoryview` — The bytes-like object to search in.
+  - `needle`: `bytes | bytearray | memoryview | tuple[int, ...] | list[int] | Sequence[int]` — An arbitrary byte sequence to locate.
 - Returns:
   - The 0-based byte index (`int`) of the first occurrence of `needle`, or `None` if not found.
 
