@@ -1463,7 +1463,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     fn test_avx2_directly() {
         if std::is_x86_feature_detected!("avx2") {
             run_standard_suite(|h, n| unsafe { search_n_avx2(h, n) });
