@@ -15,6 +15,7 @@ normalize_target() {
         1|one|one_throughput|search_one) echo "one" ;;
         2|two|two_throughput|search_two) echo "two" ;;
         3|three|three_throughput|search_three) echo "three" ;;
+        n|search_n|n_throughput) echo "n" ;;
         *) echo "" ;;
     esac
 }
@@ -36,13 +37,14 @@ if [ -z "$BENCH_TARGET" ]; then
         echo "   1) one   - Single-byte search benchmark (search_one / one_throughput)"
         echo "   2) two   - Two-byte search benchmark (search_two / two_throughput)"
         echo "   3) three - Three-byte search benchmark (search_three / three_throughput)"
-        read -rp " Select benchmark suite [1/2/3 or one/two/three]: " user_choice
+        echo "   4) n     - N-byte search benchmark (search_n / n_throughput)"
+        read -rp " Select benchmark suite [1/2/3/4 or one/two/three/n]: " user_choice
         BENCH_TARGET=$(normalize_target "$user_choice")
     fi
 fi
 
 if [ -z "$BENCH_TARGET" ]; then
-    echo "Error: BENCH_TARGET is required (no default). Must be 'one', 'two', or 'three'."
+    echo "Error: BENCH_TARGET is required (no default). Must be 'one', 'two', 'three', or 'n'."
     exit 1
 fi
 
@@ -73,6 +75,13 @@ elif [ "$BENCH_TARGET" = "three" ]; then
     [ ! -f "$NPM_WASM_BENCH" ] && [ -f "$HOME/ashwa/npm/benches/wasm_three_throughput.js" ] && NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_three_throughput.js"
     PYPI_BENCH="$HOME/ashwa/pypi/benches/three_throughput.py"
     ILP_EXAMPLE="three_ilp"
+elif [ "$BENCH_TARGET" = "n" ]; then
+    SUITE_TITLE="search_n (N-Byte Needle)"
+    CORE_BENCH="n_throughput"
+    NPM_NODE_BENCH="$HOME/ashwa/npm/benches/n_throughput.mjs"
+    NPM_WASM_BENCH="$HOME/ashwa/npm/benches/wasm_n_throughput.mjs"
+    PYPI_BENCH="$HOME/ashwa/pypi/benches/n_throughput.py"
+    ILP_EXAMPLE="search_n_ilp"
 fi
 
 RESULTS_DIR="${RESULTS_DIR:-${HOME}/results/${BENCH_TARGET}}"
