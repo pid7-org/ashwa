@@ -79,7 +79,8 @@ Searches for the first occurrence of a two-byte `needle` within `haystack`.
 
 - Parameters:
   - `haystack`: `bytes | bytearray | memoryview` — The bytes-like object to search in.
-  - `needle`: `bytes | bytearray | memoryview | tuple[int, int] | list[int] | Sequence[int]` — A 2-byte sequence to locate.
+  - `needle`: `bytes | bytearray | memoryview | tuple[int, int] | list[int] | Sequence[int]` — A 2-byte
+    sequence to locate.
 - Returns:
   - The 0-based byte index (`int`) of the first occurrence of `needle`, or `None` if not found.
 
@@ -97,7 +98,8 @@ Searches for the first occurrence of a three-byte `needle` within `haystack`.
 
 - Parameters:
   - `haystack`: `bytes | bytearray | memoryview` — The bytes-like object to search in.
-  - `needle`: `bytes | bytearray | memoryview | tuple[int, int, int] | list[int] | Sequence[int]` — A 3-byte sequence to locate.
+  - `needle`: `bytes | bytearray | memoryview | tuple[int, int, int] | list[int] | Sequence[int]` — A 3-byte
+    sequence to locate.
 - Returns:
   - The 0-based byte index (`int`) of the first occurrence of `needle`, or `None` if not found.
 
@@ -115,7 +117,8 @@ Searches for the first occurrence of an arbitrary byte sequence `needle` within 
 
 - Parameters:
   - `haystack`: `bytes | bytearray | memoryview` — The bytes-like object to search in.
-  - `needle`: `bytes | bytearray | memoryview | tuple[int, ...] | list[int] | Sequence[int]` — An arbitrary byte sequence to locate.
+  - `needle`: `bytes | bytearray | memoryview | tuple[int, ...] | list[int] | Sequence[int]` — An arbitrary
+    byte sequence to locate.
 - Returns:
   - The 0-based byte index (`int`) of the first occurrence of `needle`, or `None` if not found.
 
@@ -132,13 +135,20 @@ Searches for the first occurrence of an arbitrary byte sequence `needle` within 
 >   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
 >   * ISA: _AVX-512BW_
 >   * Cache: L1d: 384 KiB · L1i: 256 KiB · L2: 16 MiB · L3: 105 MiB
->   * STREAM Triad: 25.76 GiB/s
+>   * STREAM Triad (Read+Write): 25.76 GiB/s
+>   * Max Single-Core Read Bandwidth: ~12.5 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
 >   * ISA: _NEON_
 >   * Cache: L1d: 1 MiB · L1i: 1 MiB · L2: 16 MiB · L3: 32 MiB
->   * STREAM Triad: 75.48 GiB/s
+>   * STREAM Triad (Read+Write): 75.48 GiB/s
+>   * Max Single-Core Read Bandwidth: ~25.5 GiB/s
+
+> All benchmarks execute while pinned to a single physical core (mostly to 0th core). For out-of-cache RAM-bound
+> payloads (>256 MiB), every search routine fully saturates the hardwares maximum single-core memory bandwidth
+> ceiling (~12 GiB/s on x64, ~25 GiB/s on arm64). Execution is 100% memory-bandwidth bound rather than
+> compute-bound searching data as fast as the physical memory bus can deliver bytes into the CPU registers.
 
 ### `search_one`
 
@@ -173,7 +183,7 @@ Searches for the first occurrence of an arbitrary byte sequence `needle` within 
 | RAM        | 512 MiB   | 41.46 ms      | 35.87 ms        | 12.06 GiB/s      | 13.94 GiB/s        |
 | RAM        | 1 GiB     | 87.15 ms      | 71.73 ms        | 11.47 GiB/s      | 13.94 GiB/s        |
 
-### `search_n` (where N = 8)
+### `search_n` (where `len(N) = 8`)
 
 | Level      | Payload   | Latency (x64) | Latency (arm64) | Throughput (x64) | Throughput (arm64) |
 |:-----------|:----------|:--------------|:----------------|:-----------------|:-------------------|
