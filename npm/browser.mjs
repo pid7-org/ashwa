@@ -11,6 +11,7 @@ import initWasm, {
   searchOne as wasmSearchOne,
   searchTwo as wasmSearchTwo,
   searchThree as wasmSearchThree,
+  searchN as wasmSearchN,
 } from "./wasm/pkg/ashwa_wasm.js";
 
 let isInitialized = false;
@@ -135,6 +136,34 @@ export async function searchThree(haystack, needle) {
   }
 
   const res = wasmSearchThree(haystack, n);
+  return res !== undefined && res !== null ? Number(res) : null;
+}
+
+/**
+ * Searches for the first occurrence of an arbitrary byte sequence `needle` in `haystack` via WebAssembly SIMD.
+ * Automatically initializes WASM if not already loaded.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {Uint8Array|number[]} needle - Byte sequence to locate.
+ * @returns {Promise<number|null>} Resolves to 0-based matching index or null if not found.
+ */
+export async function searchN(haystack, needle) {
+  const n = Array.isArray(needle) ? new Uint8Array(needle) : needle;
+  if (
+    n == null ||
+    !(
+      n instanceof Uint8Array ||
+      (typeof Buffer !== "undefined" && Buffer.isBuffer(n))
+    )
+  ) {
+    throw new TypeError("needle must be a Uint8Array, Buffer, or byte array");
+  }
+
+  if (!isInitialized) {
+    await init();
+  }
+
+  const res = wasmSearchN(haystack, n);
   return res !== undefined && res !== null ? Number(res) : null;
 }
 

@@ -700,6 +700,7 @@ if (!nativeBinding) {
 }
 
 module.exports = nativeBinding
+module.exports.searchN = nativeBinding.searchN
 module.exports.searchOne = nativeBinding.searchOne
 module.exports.searchThree = nativeBinding.searchThree
 module.exports.searchTwo = nativeBinding.searchTwo

@@ -118,6 +118,32 @@ async function searchThree(haystack, needle) {
   return res !== undefined && res !== null ? Number(res) : null;
 }
 
+/**
+ * Searches for the first occurrence of an arbitrary byte sequence `needle` in `haystack` via WebAssembly SIMD.
+ * Automatically initializes WASM if not already loaded.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {Uint8Array|number[]} needle - Byte sequence to locate.
+ * @returns {Promise<number|null>} Resolves to 0-based matching index or null if not found.
+ */
+async function searchN(haystack, needle) {
+  const n = Array.isArray(needle) ? new Uint8Array(needle) : needle;
+  if (
+    n == null ||
+    !(
+      n instanceof Uint8Array ||
+      (typeof Buffer !== "undefined" && Buffer.isBuffer(n))
+    )
+  ) {
+    throw new TypeError("needle must be a Uint8Array, Buffer, or byte array");
+  }
+  if (!wasmModule) {
+    await init();
+  }
+  const res = wasmModule.searchN(haystack, n);
+  return res !== undefined && res !== null ? Number(res) : null;
+}
+
 module.exports = {
   /**
    * `false` indicating WebAssembly execution mode.
@@ -128,4 +154,5 @@ module.exports = {
   searchOne,
   searchTwo,
   searchThree,
+  searchN,
 };

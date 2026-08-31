@@ -53,4 +53,18 @@ pub fn search_three(haystack: &[u8], needle: &[u8]) -> Option<i64> {
     ashwa::search_three(haystack, [needle[0], needle[1], needle[2]]).map(|i| i as i64)
 }
 
+/// Searches for the first occurrence of `needle` in `haystack`.
+///
+/// # Arguments
+/// * `haystack` - A byte slice (`&[u8]`) to search within.
+/// * `needle` - A byte slice (`&[u8]`) to locate.
+///
+/// # Returns
+/// * `Some(index)` - The 0-based byte index of the first match.
+/// * `None` - If `needle` is not found.
+#[wasm_bindgen(js_name = "searchN")]
+pub fn search_n(haystack: &[u8], needle: &[u8]) -> Option<i64> {
+    ashwa::search_n(haystack, needle).map(|i| i as i64)
+}
+
 

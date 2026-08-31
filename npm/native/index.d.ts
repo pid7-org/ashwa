@@ -5,6 +5,19 @@
  *
  * # Arguments
  * * `haystack` - A byte slice (`&[u8]`) to search within.
+ * * `needle` - A byte slice (`&[u8]`) to locate.
+ *
+ * # Returns
+ * * `Some(index)` - The 0-based byte index of the first match.
+ * * `None` - If `needle` is not found.
+ */
+export declare function searchN(haystack: Uint8Array, needle: Uint8Array): number | null
+
+/**
+ * Searches for the first occurrence of `needle` in `haystack`.
+ *
+ * # Arguments
+ * * `haystack` - A byte slice (`&[u8]`) to search within.
  * * `needle` - The byte (`u8`) to find.
  *
  * # Returns

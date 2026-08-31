@@ -71,3 +71,26 @@ export function searchThree(haystack, needle) {
   return res !== undefined && res !== null ? Number(res) : null;
 }
 
+/**
+ * Searches for the first occurrence of an arbitrary byte sequence `needle` in `haystack`.
+ *
+ * @param {Uint8Array} haystack - Byte array to search.
+ * @param {Uint8Array|number[]} needle - Byte sequence to locate.
+ * @returns {number|null} 0-based index or null if not found.
+ */
+export function searchN(haystack, needle) {
+  const n = Array.isArray(needle) ? new Uint8Array(needle) : needle;
+  if (
+    n == null ||
+    !(
+      n instanceof Uint8Array ||
+      (typeof Buffer !== "undefined" && Buffer.isBuffer(n))
+    )
+  ) {
+    throw new TypeError("needle must be a Uint8Array, Buffer, or byte array");
+  }
+
+  const res = native.searchN(haystack, n);
+  return res !== undefined && res !== null ? Number(res) : null;
+}
+
