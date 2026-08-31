@@ -190,6 +190,9 @@ class TestModule:
     def test_search_three_is_callable(self):
         assert callable(ashwa.search_three)
 
+    def test_search_n_is_callable(self):
+        assert callable(ashwa.search_n)
+
     def test_search_one_in_all(self):
         assert "search_one" in ashwa.__all__
 
@@ -198,6 +201,9 @@ class TestModule:
 
     def test_search_three_in_all(self):
         assert "search_three" in ashwa.__all__
+
+    def test_search_n_in_all(self):
+        assert "search_n" in ashwa.__all__
 
 def test_standard_suite_bytes():
     _standard_suite(ashwa.search_one)
@@ -800,4 +806,220 @@ class TestSearchThreeInvalidInputs:
 
 def test_standard_three_suite_bytes():
     _standard_three_suite(ashwa.search_three)
+
+
+def _standard_n_suite(search_fn):
+    assert search_fn(b"", b"") == 0
+    assert search_fn(b"abc", b"") == 0
+    assert search_fn(b"", b"a") is None
+    assert search_fn(b"", b"abcd") is None
+
+    assert search_fn(b"a", b"abcd") is None
+    assert search_fn(b"ab", b"abcd") is None
+    assert search_fn(b"abc", b"abcd") is None
+
+    assert search_fn(b"abcd", b"abcd") == 0
+    assert search_fn(b"abce", b"abcd") is None
+    assert search_fn(b"bacd", b"abcd") is None
+
+    haystack = b"the quick brown fox jumps over the lazy dog"
+    assert search_fn(haystack, b"ZZZZ") is None
+    assert search_fn(haystack, b"!!!!") is None
+    assert search_fn(haystack, b"quick") == 0x04
+    assert search_fn(haystack, b"brown fox") == 0x0A
+    assert search_fn(haystack, b"lazy dog") == 0x23
+    assert search_fn(haystack, b"the quick brown fox jumps over the lazy dog") == 0x00
+    assert search_fn(haystack, b"lazy dog!") is None
+
+    for needle_len in [1, 2, 3, 4, 5, 8, 16]:
+        needle = bytes([ord("A") + i for i in range(needle_len)])
+        for length in range(needle_len, needle_len + 8):
+            for pos in range(length - needle_len + 1):
+                h = bytearray(b"-" * length)
+                h[pos : pos + needle_len] = needle
+                assert (
+                    search_fn(bytes(h), needle) == pos
+                ), f"failed finding needle {needle!r} at pos {pos} in len {length}"
+
+    edge_cases = [
+        (8, 4, b"ABCD"),
+        (9, 5, b"ABCD"),
+        (16, 12, b"CDEF"),
+        (17, 13, b"CDEF"),
+        (24, 20, b"EFGH"),
+        (25, 21, b"EFGH"),
+        (32, 28, b"GHIJ"),
+        (33, 29, b"GHIJ"),
+        (34, 30, b"GHIJ"),
+        (64, 48, b"0123456789ABCDEF"),
+        (65, 49, b"0123456789ABCDEF"),
+    ]
+    for size, pos, needle in edge_cases:
+        h = bytearray(b"-" * size)
+        h[pos : pos + len(needle)] = needle
+        assert search_fn(bytes(h), needle) == pos, f"boundary failed for size {size} at pos {pos}"
+
+    cross_positions = [
+        0x03, 0x04, 0x07, 0x08, 0x0B, 0x0C, 0x0F, 0x10, 0x13, 0x14, 0x17, 0x18, 0x1B, 0x1C,
+        0x1F, 0x20, 0x27, 0x28, 0x3E, 0x3F, 0x40,
+    ]
+    cross_buf = bytearray(b"-" * 0x80)
+    for pos in cross_positions:
+        cross_buf[pos : pos + 4] = b"WXYZ"
+        assert (
+            search_fn(bytes(cross_buf), b"WXYZ") == pos
+        ), f"Failed straddling cross-word position {pos:#x}"
+        cross_buf[pos : pos + 4] = b"----"
+
+    haystack = bytearray(b"-" * 0x200)
+    for i in range(len(haystack) - 4):
+        haystack[i : i + 4] = b"ABCD"
+        result = search_fn(bytes(haystack), b"ABCD")
+        assert result == i, f"sweep failed at index {i}"
+        haystack[i : i + 4] = b"----"
+
+    assert search_fn(b"aaaaaaaa", b"aaaa") == 0
+    assert search_fn(b"baaaaaaa", b"aaaa") == 1
+    assert search_fn(b"bbaaaaaa", b"aaaa") == 2
+    assert search_fn(b"abcdabcd", b"abcd") == 0
+    assert search_fn(b"zabcdabcd", b"abcd") == 1
+
+    h = bytearray([0x80] * 0x40)
+    h[0x3C : 0x40] = b"\xfc\xfd\xfe\xff"
+    assert search_fn(bytes(h), b"\x7d\x7e\x7f\x80") is None
+    assert search_fn(bytes(h), b"\xfc\xfd\xfe\xff") == 0x3C
+
+    h = bytearray([0xFF] * 0x50)
+    h[0x2A : 0x2E] = b"\x00\x00\x00\x00"
+    assert search_fn(bytes(h), b"\x00\x00\x00\x00") == 0x2A
+
+    huge = bytearray(b"x" * (0x64 * 0x400))
+    assert search_fn(bytes(huge), b"WXYZ") is None
+    huge[-4:] = b"WXYZ"
+    assert search_fn(bytes(huge), b"WXYZ") == 0x64 * 0x400 - 4
+
+
+class TestSearchNInputTypes:
+    def test_bytes(self):
+        assert ashwa.search_n(b"hello world", b"world") == 6
+
+    def test_bytearray(self):
+        assert ashwa.search_n(bytearray(b"hello world"), b"world") == 6
+
+    def test_memoryview(self):
+        assert ashwa.search_n(memoryview(b"hello world"), b"world") == 6
+
+    def test_memoryview_of_bytearray(self):
+        assert ashwa.search_n(memoryview(bytearray(b"hello world")), b"world") == 6
+
+    def test_memoryview_slice(self):
+        data = memoryview(b"xxhello worldxx")
+        sliced = data[2:13]  # "hello world"
+        assert ashwa.search_n(sliced, b"world") == 6
+
+    def test_needle_bytes(self):
+        assert ashwa.search_n(b"hello world", b"ello") == 1
+
+    def test_needle_bytearray(self):
+        assert ashwa.search_n(b"hello world", bytearray(b"ello")) == 1
+
+    def test_needle_memoryview(self):
+        assert ashwa.search_n(b"hello world", memoryview(b"ello")) == 1
+
+    def test_needle_tuple(self):
+        assert ashwa.search_n(b"hello world", (ord("e"), ord("l"), ord("l"), ord("o"))) == 1
+
+    def test_needle_list(self):
+        assert ashwa.search_n(b"hello world", [ord("e"), ord("l"), ord("l"), ord("o")]) == 1
+
+    def test_needle_empty(self):
+        assert ashwa.search_n(b"hello world", b"") == 0
+        assert ashwa.search_n(b"hello world", []) == 0
+        assert ashwa.search_n(b"hello world", ()) == 0
+
+    def test_full_suite_on_bytearray(self):
+        def search(h, n):
+            return ashwa.search_n(bytearray(h), n)
+        _standard_n_suite(search)
+
+    def test_full_suite_on_memoryview(self):
+        def search(h, n):
+            return ashwa.search_n(memoryview(h), n)
+        _standard_n_suite(search)
+
+    def test_full_suite_with_tuple_needle(self):
+        def search(h, n):
+            return ashwa.search_n(h, tuple(n))
+        _standard_n_suite(search)
+
+    def test_full_suite_with_list_needle(self):
+        def search(h, n):
+            return ashwa.search_n(h, list(n))
+        _standard_n_suite(search)
+
+
+class TestSearchNReturnType:
+    def test_found_returns_int(self):
+        result = ashwa.search_n(b"abcdef", b"bcde")
+        assert result == 1
+        assert type(result) is int
+
+    def test_not_found_returns_none(self):
+        result = ashwa.search_n(b"abcdef", b"zzzz")
+        assert result is None
+
+    def test_found_at_zero(self):
+        assert ashwa.search_n(b"abcdef", b"abcd") == 0
+
+    def test_found_at_last(self):
+        data = b"abcdefgh"
+        assert ashwa.search_n(data, b"efgh") == len(data) - 4
+
+
+class TestSearchNNeedleBoundaries:
+    def test_needle_zero(self):
+        assert ashwa.search_n(b"\x00\x00\x00\x00", b"\x00\x00\x00\x00") == 0
+        assert ashwa.search_n(b"\xff\x00\x00\x00\x00", b"\x00\x00\x00\x00") == 1
+        assert ashwa.search_n(b"\xff\x00\x00\x00", b"\x00\x00\x00\x00") is None
+
+    def test_needle_255(self):
+        assert ashwa.search_n(b"\xff\xff\xff\xff", b"\xff\xff\xff\xff") == 0
+        assert ashwa.search_n(b"\x00\xff\xff\xff\xff", b"\xff\xff\xff\xff") == 1
+        assert ashwa.search_n(b"\x00\xff\xff\xff", b"\xff\xff\xff\xff") is None
+
+
+class TestSearchNInvalidInputs:
+    @pytest.mark.parametrize("bad_haystack", [
+        "hello",        # str
+        123,            # int
+        3.14,           # float
+        ["h", "i"],     # list
+        None,
+    ])
+    def test_invalid_haystack_type(self, bad_haystack):
+        with pytest.raises(TypeError):
+            ashwa.search_n(bad_haystack, b"hell")
+
+    @pytest.mark.parametrize("bad_needle", [
+        "abcd",         # str instead of bytes/sequence of int
+        123,            # int instead of sequence
+        3.14,           # float
+        None,
+        [65, 66, "c"],  # list with non-int element
+    ])
+    def test_invalid_needle_type(self, bad_needle):
+        with pytest.raises(TypeError):
+            ashwa.search_n(b"hello", bad_needle)
+
+    def test_needle_out_of_range_negative(self):
+        with pytest.raises((TypeError, OverflowError)):
+            ashwa.search_n(b"hello", [-1, ord("h"), ord("e"), ord("l")])
+
+    def test_needle_out_of_range_high(self):
+        with pytest.raises((TypeError, OverflowError)):
+            ashwa.search_n(b"hello", [256, ord("h"), ord("e"), ord("l")])
+
+
+def test_standard_n_suite_bytes():
+    _standard_n_suite(ashwa.search_n)
 
