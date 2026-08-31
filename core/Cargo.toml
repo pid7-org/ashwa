@@ -46,6 +46,12 @@ name = "two_ilp"
 [[example]]
 name = "three_ilp"
 
+[[example]]
+name = "search_n_ilp"
+
+[[example]]
+name = "n_ilp"
+
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [

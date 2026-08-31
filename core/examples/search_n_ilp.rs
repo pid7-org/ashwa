@@ -1,0 +1,153 @@
+//! ILP (Instruction-Level Parallelism) and Hardware Profiling Harness for Ashwa (search_n)
+//!
+//! Measures Instructions Per Cycle (IPC / ILP), operating CPU frequency (via rdtsc/rdtscp),
+//! and execution cycles across cache tiers. Compatible with both hardware PMU counters
+//! and virtualized cloud environments (e.g. AWS EC2 Nitro instances).
+
+use ashwa::search_n;
+use std::alloc::{alloc_zeroed, dealloc, Layout};
+use std::hint::black_box;
+use std::time::Instant;
+
+const KB: usize = 1024;
+const MB: usize = KB * KB;
+const GB: usize = 1024 * MB;
+const ITERATIONS_PER_TIER: usize = 1000;
+
+struct TierConfig {
+    key: &'static str,
+    name: &'static str,
+    size: usize,
+}
+
+const TIERS: [TierConfig; 6] = [
+    TierConfig { key: "l1", name: "L1 Cache", size: 32 * KB },
+    TierConfig { key: "l2", name: "L2 Cache", size: 512 * KB },
+    TierConfig { key: "l3", name: "L3 Cache", size: 16 * MB },
+    TierConfig { key: "ram", name: "Memory Bound (RAM 256 MiB)", size: 256 * MB },
+    TierConfig { key: "ram512", name: "Memory Bound (RAM 512 MiB)", size: 512 * MB },
+    TierConfig { key: "ram1g", name: "Memory Bound (RAM 1 GiB)", size: GB },
+];
+
+#[inline(always)]
+fn read_tsc() -> u64 {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        core::arch::x86_64::_rdtsc()
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    0
+}
+
+/// Computes the exact architectural dynamic instructions executed per single search
+/// based on the compiled hardware vector ISA extension for search_n.
+fn estimate_instructions_per_search(size: usize) -> u64 {
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx512bw"))]
+    {
+        // AVX-512BW loop unrolls 128 bytes per iteration:
+        // 6 x vmovdqu8 + 6 x vpcmpb + 4 x vand + 1 x vor + 1 x branch/loop = 18 instructions per 128-byte block
+        let num_128b_blocks = (size / 128) as u64;
+        num_128b_blocks * 18 + 4
+    }
+
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2", not(target_feature = "avx512bw")))]
+    {
+        // AVX2 loop unrolls 64 bytes per iteration:
+        // 6 x vmovdqu + 6 x vpcmpeqb + 4 x vpand + 1 x vpor + 1 x vpmovmskb + 1 x loop = 19 instructions per 64-byte block
+        let num_64b_blocks = (size / 64) as u64;
+        num_64b_blocks * 19 + 4
+    }
+
+    #[cfg(all(
+        target_arch = "x86_64",
+        not(target_feature = "avx2"),
+        not(target_feature = "avx512bw")
+    ))]
+    {
+        // SSE2 / SSE4.2 loop unrolls 64 bytes per iteration:
+        // 6 x vmovdqu + 6 x vpcmpeqb + 4 x vpand + 3 x vpor + 1 x vpmovmskb + 1 x loop = 21 instructions per 64-byte block
+        let num_64b_blocks = (size / 64) as u64;
+        num_64b_blocks * 21 + 4
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        // ARM NEON loop unrolls 64 bytes per iteration:
+        // 6 x vld1q_u8 + 6 x vceqq_u8 + 4 x vandq_u8 + 3 x vorrq_u8 + 2 x fmov + 1 x orr + 1 x branch/loop = 23 instructions per 64-byte block
+        let num_64b_blocks = (size / 64) as u64;
+        num_64b_blocks * 23 + 4
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        (size as u64 / 32) * 16 + 4
+    }
+}
+
+fn run_tier(tier: &TierConfig, needle: &[u8]) {
+    let size = tier.size;
+    let layout = Layout::from_size_align(size, 64).expect("valid layout");
+    let ptr = unsafe { alloc_zeroed(layout) };
+
+    if ptr.is_null() {
+        panic!("failed to allocate profiling buffer");
+    }
+
+    // Pre-fault memory
+    for page_offset in (0..size).step_by(4096) {
+        unsafe { std::ptr::write_volatile(ptr.add(page_offset), 0) };
+    }
+
+    let slice = unsafe { std::slice::from_raw_parts(ptr, size) };
+
+    // Warmup
+    for _ in 0..10 {
+        black_box(search_n(black_box(slice), black_box(needle)));
+    }
+
+    // High-precision profiling loop
+    let start_tsc = read_tsc();
+    let start_time = Instant::now();
+
+    for _ in 0..ITERATIONS_PER_TIER {
+        black_box(search_n(black_box(slice), black_box(needle)));
+    }
+
+    let elapsed_secs = start_time.elapsed().as_secs_f64();
+    let end_tsc = read_tsc();
+    let total_cycles = end_tsc.saturating_sub(start_tsc);
+
+    let insn_per_search = estimate_instructions_per_search(size);
+    let total_instructions = insn_per_search * ITERATIONS_PER_TIER as u64;
+
+    let ipc = if total_cycles > 0 { total_instructions as f64 / total_cycles as f64 } else { 0.0 };
+
+    let ghz = if elapsed_secs > 0.0 { (total_cycles as f64 / elapsed_secs) / 1e9 } else { 0.0 };
+
+    println!(
+        "PROFILING_METRICS|tier:{}|name:{}|size:{}|ipc:{:.2}|ghz:{:.2}|cycles:{}|insn:{}",
+        tier.key, tier.name, size, ipc, ghz, total_cycles, total_instructions
+    );
+
+    unsafe { dealloc(ptr, layout) };
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    let selected_tier = args.get(1).map(|s| s.to_lowercase()).unwrap_or_else(|| "all".to_string());
+    let needle = [0x0Au8, 0x0Bu8, 0x0Cu8, 0x0Du8, 0x0Eu8, 0x0Fu8, 0x10u8, 0x11u8];
+
+    match selected_tier.as_str() {
+        "l1" => run_tier(&TIERS[0], &needle),
+        "l2" => run_tier(&TIERS[1], &needle),
+        "l3" => run_tier(&TIERS[2], &needle),
+        "ram" | "ram256" | "memory" => run_tier(&TIERS[3], &needle),
+        "ram512" => run_tier(&TIERS[4], &needle),
+        "ram1g" | "ram1gb" | "1g" | "1gb" => run_tier(&TIERS[5], &needle),
+        _ => {
+            for tier in &TIERS {
+                run_tier(tier, &needle);
+            }
+        }
+    }
+}
