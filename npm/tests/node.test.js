@@ -4,6 +4,7 @@ const {
   searchOne,
   searchTwo,
   searchThree,
+  searchN,
   isNative,
   init,
   initSync,
@@ -15,6 +16,7 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(typeof searchOne, "function");
     strictEqual(typeof searchTwo, "function");
     strictEqual(typeof searchThree, "function");
+    strictEqual(typeof searchN, "function");
     strictEqual(typeof init, "function");
     strictEqual(typeof initSync, "function");
 
@@ -51,7 +53,24 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(searchThree(haystack, [0x61, 0x62, 0x63]), 0);
   });
 
-  test("Pangram spot-checks for searchTwo and searchThree", () => {
+  test("Basic searchN operations", () => {
+    const haystack = Buffer.from("abcdefghijklmnopqrstuvwxyz");
+
+    strictEqual(searchN(haystack, Buffer.from("a")), 0);
+    strictEqual(searchN(haystack, Buffer.from("ab")), 0);
+    strictEqual(searchN(haystack, Buffer.from("abc")), 0);
+    strictEqual(searchN(haystack, Buffer.from("cde")), 2);
+    strictEqual(searchN(haystack, Buffer.from("mnop")), 12);
+    strictEqual(searchN(haystack, Buffer.from("vwxyz")), 21);
+    strictEqual(searchN(haystack, Buffer.from("abcdefghijklmnopqrstuvwxyz")), 0);
+    strictEqual(searchN(haystack, Buffer.from("abcdefghijklmnopqrstuvwxyz!")), null);
+    strictEqual(searchN(haystack, Buffer.from("XYZ")), null);
+    strictEqual(searchN(haystack, [0x61, 0x62, 0x63, 0x64]), 0);
+    strictEqual(searchN(haystack, []), 0);
+    strictEqual(searchN(haystack, new Uint8Array(0)), 0);
+  });
+
+  test("Pangram spot-checks for searchTwo, searchThree, and searchN", () => {
     const haystack = Buffer.from("the quick brown fox jumps over the lazy dog");
 
     strictEqual(searchTwo(haystack, Buffer.from("th")), 0);
@@ -69,6 +88,13 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(searchThree(haystack, Buffer.from("dog")), 40);
     strictEqual(searchThree(haystack, Buffer.from("ZZZ")), null);
     strictEqual(searchThree(haystack, Buffer.from("!!!")), null);
+
+    strictEqual(searchN(haystack, Buffer.from("quick")), 4);
+    strictEqual(searchN(haystack, Buffer.from("brown fox")), 10);
+    strictEqual(searchN(haystack, Buffer.from("lazy dog")), 35);
+    strictEqual(searchN(haystack, Buffer.from("the quick brown fox jumps over the lazy dog")), 0);
+    strictEqual(searchN(haystack, Buffer.from("lazy dog!")), null);
+    strictEqual(searchN(haystack, Buffer.from("!!!")), null);
   });
 
   test("Empty buffer search", () => {
@@ -87,6 +113,12 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(searchThree(emptyBuf, Buffer.from("abc")), null);
     strictEqual(searchThree(singleByte, Buffer.from("abc")), null);
     strictEqual(searchThree(Buffer.from("ab"), Buffer.from("abc")), null);
+
+    strictEqual(searchN(emptyUint8, Buffer.from("abcd")), null);
+    strictEqual(searchN(emptyBuf, Buffer.from("abcd")), null);
+    strictEqual(searchN(singleByte, Buffer.from("abcd")), null);
+    strictEqual(searchN(emptyUint8, Buffer.alloc(0)), 0);
+    strictEqual(searchN(emptyBuf, Buffer.alloc(0)), 0);
   });
 
   test("Multiple occurrences return first match", () => {
@@ -99,6 +131,11 @@ describe("Node Native Backend (napi-rs)", () => {
 
     strictEqual(searchThree(haystack, Buffer.from("ana")), 1);
     strictEqual(searchThree(haystack, Buffer.from("nan")), 2);
+
+    strictEqual(searchN(haystack, Buffer.from("an")), 1);
+    strictEqual(searchN(haystack, Buffer.from("ana")), 1);
+    strictEqual(searchN(haystack, Buffer.from("anan")), 1);
+    strictEqual(searchN(haystack, Buffer.from("nana")), 2);
   });
 
   test("Binary data & extreme byte values (0x00 and 0xFF)", () => {
@@ -121,6 +158,13 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(searchThree(binaryData3, new Uint8Array([0x00, 0x00, 0x00])), 1);
     strictEqual(searchThree(binaryData3, new Uint8Array([0xfd, 0xfe, 0xff])), 5);
     strictEqual(searchThree(binaryData3, new Uint8Array([0xff, 0xff, 0xff])), null);
+
+    const binaryDataN = new Uint8Array([
+      0x10, 0x00, 0x00, 0x00, 0x00, 0x30, 0xfc, 0xfd, 0xfe, 0xff, 0x40,
+    ]);
+    strictEqual(searchN(binaryDataN, new Uint8Array([0x00, 0x00, 0x00, 0x00])), 1);
+    strictEqual(searchN(binaryDataN, new Uint8Array([0xfc, 0xfd, 0xfe, 0xff])), 6);
+    strictEqual(searchN(binaryDataN, new Uint8Array([0xff, 0xff, 0xff, 0xff])), null);
   });
 
   test("Overlapping & repeating patterns", () => {
@@ -136,6 +180,12 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(searchThree(Buffer.from("abcabc"), Buffer.from("abc")), 0);
     strictEqual(searchThree(Buffer.from("zabcabc"), Buffer.from("abc")), 1);
 
+    strictEqual(searchN(Buffer.from("aaaaaaaa"), Buffer.from("aaaa")), 0);
+    strictEqual(searchN(Buffer.from("baaaaaaa"), Buffer.from("aaaa")), 1);
+    strictEqual(searchN(Buffer.from("bbaaaaaa"), Buffer.from("aaaa")), 2);
+    strictEqual(searchN(Buffer.from("abcdabcd"), Buffer.from("abcd")), 0);
+    strictEqual(searchN(Buffer.from("zabcdabcd"), Buffer.from("abcd")), 1);
+
     const allA = Buffer.alloc(256, "A");
     strictEqual(searchTwo(allA, Buffer.from("AB")), null);
     allA[120] = "B".charCodeAt(0);
@@ -145,6 +195,13 @@ describe("Node Native Backend (napi-rs)", () => {
     allA3[120] = "B".charCodeAt(0);
     allA3[121] = "C".charCodeAt(0);
     strictEqual(searchThree(allA3, Buffer.from("ABC")), 119);
+
+    const allAN = Buffer.alloc(256, "A");
+    allAN[120] = "B".charCodeAt(0);
+    allAN[121] = "C".charCodeAt(0);
+    allAN[122] = "D".charCodeAt(0);
+    allAN[123] = "E".charCodeAt(0);
+    strictEqual(searchN(allAN, Buffer.from("ABCDE")), 119);
   });
 
   test("Buffer types compatibility (Buffer vs Uint8Array vs Subarray)", () => {
@@ -165,6 +222,10 @@ describe("Node Native Backend (napi-rs)", () => {
     strictEqual(searchThree(uint8, new Uint8Array([50, 60, 70])), 4);
     strictEqual(searchThree(nodeBuf, Buffer.from([50, 60, 70])), 4);
     strictEqual(searchThree(subarray, [50, 60, 70]), 2);
+
+    strictEqual(searchN(uint8, new Uint8Array([50, 60, 70, 80])), 4);
+    strictEqual(searchN(nodeBuf, Buffer.from([50, 60, 70, 80])), 4);
+    strictEqual(searchN(subarray, [50, 60, 70]), 2);
   });
 
   test("Unaligned byteOffset subarray searches", () => {
@@ -174,11 +235,13 @@ describe("Node Native Backend (napi-rs)", () => {
     view[19] = 0xaa;
     view[20] = 0xbb;
     view[21] = 0xcc;
+    view[22] = 0xdd;
 
     // NOTE: Unaligned buffer views must compute relative index correctly
     strictEqual(searchOne(view, 0xaa), 19);
     strictEqual(searchTwo(view, new Uint8Array([0xaa, 0xbb])), 19);
     strictEqual(searchThree(view, new Uint8Array([0xaa, 0xbb, 0xcc])), 19);
+    strictEqual(searchN(view, new Uint8Array([0xaa, 0xbb, 0xcc, 0xdd])), 19);
   });
 
   test("SIMD boundary & chunk sizes", () => {
@@ -258,9 +321,33 @@ describe("Node Native Backend (napi-rs)", () => {
         strictEqual(searchThree(buf, [0xbb, 0xcc, 0xdd]), mid);
       }
     }
+
+    for (const size of sizes.filter((s) => s >= 5)) {
+      const buf = new Uint8Array(size);
+      buf.fill(0xaa);
+
+      buf[0] = 0x11;
+      buf[1] = 0x22;
+      buf[2] = 0x33;
+      buf[3] = 0x44;
+      buf[4] = 0x55;
+      strictEqual(searchN(buf, [0x11, 0x22, 0x33, 0x44, 0x55]), 0);
+
+      buf[0] = 0xaa;
+      buf[1] = 0xaa;
+      buf[2] = 0xaa;
+      buf[3] = 0xaa;
+      buf[4] = 0xaa;
+      buf[size - 5] = 0x11;
+      buf[size - 4] = 0x22;
+      buf[size - 3] = 0x33;
+      buf[size - 2] = 0x44;
+      buf[size - 1] = 0x55;
+      strictEqual(searchN(buf, [0x11, 0x22, 0x33, 0x44, 0x55]), size - 5);
+    }
   });
 
-  test("Straddling chunk boundaries for searchTwo and searchThree", () => {
+  test("Straddling chunk boundaries for searchTwo, searchThree, and searchN", () => {
     const crossPositions = [
       0x03, 0x04, 0x07, 0x08, 0x0b, 0x0c, 0x0f, 0x10, 0x13, 0x14, 0x17, 0x18,
       0x1b, 0x1c, 0x1f, 0x20, 0x27, 0x28, 0x3f, 0x40,
@@ -284,6 +371,19 @@ describe("Node Native Backend (napi-rs)", () => {
       crossBuf3[pos + 1] = "-".charCodeAt(0);
       crossBuf3[pos + 2] = "-".charCodeAt(0);
     }
+
+    const crossBufN = Buffer.alloc(0x80, "-");
+    for (const pos of crossPositions) {
+      crossBufN[pos] = "W".charCodeAt(0);
+      crossBufN[pos + 1] = "X".charCodeAt(0);
+      crossBufN[pos + 2] = "Y".charCodeAt(0);
+      crossBufN[pos + 3] = "Z".charCodeAt(0);
+      strictEqual(searchN(crossBufN, Buffer.from("WXYZ")), pos);
+      crossBufN[pos] = "-".charCodeAt(0);
+      crossBufN[pos + 1] = "-".charCodeAt(0);
+      crossBufN[pos + 2] = "-".charCodeAt(0);
+      crossBufN[pos + 3] = "-".charCodeAt(0);
+    }
   });
 
   test("Large payload search (1MB payload)", () => {
@@ -291,7 +391,7 @@ describe("Node Native Backend (napi-rs)", () => {
     const buf = new Uint8Array(size);
     buf.fill(0x41);
 
-    const targetIndices = [0, 15, 16, 31, 32, 63, 64, 5000, 50000, size - 3];
+    const targetIndices = [0, 15, 16, 31, 32, 63, 64, 5000, 50000, size - 5];
 
     for (const idx of targetIndices) {
       buf[idx] = 0x42;
@@ -300,9 +400,14 @@ describe("Node Native Backend (napi-rs)", () => {
       strictEqual(searchTwo(buf, [0x42, 0x43]), idx);
       buf[idx + 2] = 0x44;
       strictEqual(searchThree(buf, [0x42, 0x43, 0x44]), idx);
+      buf[idx + 3] = 0x45;
+      buf[idx + 4] = 0x46;
+      strictEqual(searchN(buf, [0x42, 0x43, 0x44, 0x45, 0x46]), idx);
       buf[idx] = 0x41;
       buf[idx + 1] = 0x41;
       buf[idx + 2] = 0x41;
+      buf[idx + 3] = 0x41;
+      buf[idx + 4] = 0x41;
     }
   });
 
@@ -315,7 +420,7 @@ describe("Node Native Backend (napi-rs)", () => {
     }
 
     const testPositions = [
-      0, 1, 15, 16, 30, 31, 32, 63, 64, 100, 511, 1023, 2047, 4093,
+      0, 1, 15, 16, 30, 31, 32, 63, 64, 100, 511, 1023, 2047, 4090,
     ];
     for (const pos of testPositions) {
       buf[pos] = 255;
@@ -324,9 +429,12 @@ describe("Node Native Backend (napi-rs)", () => {
       strictEqual(searchTwo(buf, [255, 254]), pos);
       buf[pos + 2] = 253;
       strictEqual(searchThree(buf, [255, 254, 253]), pos);
+      buf[pos + 3] = 252;
+      strictEqual(searchN(buf, [255, 254, 253, 252]), pos);
       buf[pos] = (pos * 31 + 7) % 255;
       buf[pos + 1] = ((pos + 1) * 31 + 7) % 255;
       buf[pos + 2] = ((pos + 2) * 31 + 7) % 255;
+      buf[pos + 3] = ((pos + 3) * 31 + 7) % 255;
     }
   });
 
@@ -362,5 +470,12 @@ describe("Node Native Backend (napi-rs)", () => {
     throws(() =>
       searchThree(new Uint8Array([10, 20]), new Uint8Array([65, 66, 67, 68])),
     );
+
+    throws(() => searchN(null, [65, 66, 67, 68]));
+    throws(() => searchN(undefined, [65, 66, 67, 68]));
+    throws(() => searchN("not_a_buffer", [65, 66, 67, 68]));
+    throws(() => searchN(new Uint8Array([10, 20]), null));
+    throws(() => searchN(new Uint8Array([10, 20]), undefined));
+    throws(() => searchN(new Uint8Array([10, 20]), "not_a_needle"));
   });
 });

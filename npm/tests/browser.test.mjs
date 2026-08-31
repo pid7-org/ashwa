@@ -70,6 +70,11 @@ describe("Headless Browser WASM SIMD128 Execution", () => {
         const matchWor = mod.searchThree(haystack, needleWor);
         const matchZZZ = mod.searchThree(haystack, needleZZZ);
 
+        const needleWorld = new TextEncoder().encode("World");
+        const needleNotFound = new TextEncoder().encode("Not Found");
+        const matchWorld = mod.searchN(haystack, needleWorld);
+        const matchNotFound = mod.searchN(haystack, needleNotFound);
+
         return {
           matchW: Number(matchW),
           matchZ: matchZ != null ? Number(matchZ) : null,
@@ -77,6 +82,8 @@ describe("Headless Browser WASM SIMD128 Execution", () => {
           matchZZ: matchZZ != null ? Number(matchZZ) : null,
           matchWor: matchWor != null ? Number(matchWor) : null,
           matchZZZ: matchZZZ != null ? Number(matchZZZ) : null,
+          matchWorld: matchWorld != null ? Number(matchWorld) : null,
+          matchNotFound: matchNotFound != null ? Number(matchNotFound) : null,
         };
       },
       { code: jsCode, base64: wasmBase64 },
@@ -88,6 +95,8 @@ describe("Headless Browser WASM SIMD128 Execution", () => {
     assert.strictEqual(result.matchZZ, null);
     assert.strictEqual(result.matchWor, 7);
     assert.strictEqual(result.matchZZZ, null);
+    assert.strictEqual(result.matchWorld, 7);
+    assert.strictEqual(result.matchNotFound, null);
   });
 
   test("Teardown Headless Chromium", async () => {
