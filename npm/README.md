@@ -66,7 +66,8 @@ console.log(`Found 'f' at byte index: ${indexOne}`); // 16
 
 ### Browser
 
-In browser and WebWorker runtimes, WebAssembly SIMD (`simd128`) is used. The WASM module automatically initializes asynchronously on the first search call, or can be pre-warmed during application startup:
+In browser and WebWorker runtimes, WebAssembly SIMD (`simd128`) is used. The WASM module automatically
+initializes asynchronously on the first search call, or can be pre-warmed during application startup:
 
 ```js
 import { init, searchOne, searchTwo } from '@pid7/ashwa';
@@ -159,10 +160,12 @@ Searches for the first occurrence of an arbitrary byte sequence `needle` within 
 function init(moduleOrPath?: any): Promise<void>;
 ```
 
-Asynchronously pre-initializes the WebAssembly module backend for Browser / WebWorker environments. In native Node.js environments (`isNative === true`), this is a no-op that resolves immediately.
+Asynchronously pre-initializes the WebAssembly module backend for Browser / WebWorker environments. In native
+Node.js environments (`isNative === true`), this is a no-op that resolves immediately.
 
 - Parameters:
-  - `moduleOrPath` *(optional)*: `WebAssembly.Module | Response | ArrayBuffer | string` — Custom WASM source or URL.
+  - `moduleOrPath` *(optional)*: `WebAssembly.Module | Response | ArrayBuffer | string` — Custom WASM source
+    or URL.
 
 ### `initSync(bytesOrModule?)`
 
@@ -170,10 +173,12 @@ Asynchronously pre-initializes the WebAssembly module backend for Browser / WebW
 function initSync(bytesOrModule?: any): void;
 ```
 
-Synchronously initializes the WebAssembly module backend with pre-compiled bytes or a `WebAssembly.Module`. In native Node.js environments, this is a no-op.
+Synchronously initializes the WebAssembly module backend with pre-compiled bytes or a `WebAssembly.Module`.
+In native Node.js environments, this is a no-op.
 
 - Parameters:
-  - `bytesOrModule` *(optional)*: `ArrayBuffer | Uint8Array | WebAssembly.Module` — Pre-loaded WASM binary or module.
+  - `bytesOrModule` *(optional)*: `ArrayBuffer | Uint8Array | WebAssembly.Module` — Pre-loaded WASM binary
+    or module.
 
 ### `isNative`
 
@@ -181,7 +186,8 @@ Synchronously initializes the WebAssembly module backend with pre-compiled bytes
 const isNative: boolean;
 ```
 
-Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bindings (`true`) or WebAssembly SIMD (`false`).
+Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bindings (`true`) or
+WebAssembly SIMD (`false`).
 
 ## Benchmarks
 
@@ -196,13 +202,20 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 >   * Instance: Intel(R) Xeon(R) Platinum 8488C (8C/16T)
 >   * ISA: _AVX-512BW_ · _WASM SIMD128_
 >   * Cache: L1d: 384 KiB · L1i: 256 KiB · L2: 16 MiB · L3: 105 MiB
->   * STREAM Triad: 25.76 GiB/s
+>   * STREAM Triad (Read + Write): 25.76 GiB/s
+>   * Max Single-Core Read Bandwidth: ~12.5 GiB/s
 >
 > * AArch64 (_arm64_)
 >   * Instance: AWS Graviton3 ARM Neoverse-V1 (16C/16T)
 >   * ISA: _NEON_
 >   * Cache: L1d: 1 MiB · L1i: 1 MiB · L2: 16 MiB · L3: 32 MiB
->   * STREAM Triad: 75.48 GiB/s
+>   * STREAM Triad (Read + Write): 75.48 GiB/s
+>   * Max Single-Core Read Bandwidth: ~25.5 GiB/s
+
+> All benchmarks execute while pinned to a single physical core (mostly to 0th core). For out-of-cache RAM-bound
+> payloads (>256 MiB), every search routine fully saturates the hardwares maximum single-core memory bandwidth
+> ceiling (~12 GiB/s on x64, ~25 GiB/s on arm64). Execution is 100% memory-bandwidth bound rather than
+> compute-bound searching data as fast as the physical memory bus can deliver bytes into the CPU registers.
 
 ### `searchOne`
 
@@ -276,7 +289,7 @@ Boolean flag indicating whether `@pid7/ashwa` is executing via native N-API bind
 | RAM        | 512 MiB   | 114.54 ms     | 4.37 GiB/s       |
 | RAM        | 1 GiB     | 227.27 ms     | 4.40 GiB/s       |
 
-### `searchN` (where N = 8)
+### `searchN` (where `len(N) = 8`)
 
 #### Native Node.js (V8 N-API)
 
