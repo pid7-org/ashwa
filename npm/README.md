@@ -24,6 +24,7 @@ Hardware accelerated routines for single substring search
   - [`searchOne`](#searchone)
   - [`searchTwo`](#searchtwo)
   - [`searchThree`](#searchthree)
+  - [`searchN`](#searchn)
   - [`init`](#init)
   - [`initSync`](#initsync)
   - [`isNative`](#isnative)
@@ -129,6 +130,24 @@ Searches for the first occurrence of a three-byte `needle` within `haystack`.
 - Parameters:
   - `haystack`: `Uint8Array` / `Buffer` — The byte sequence to search.
   - `needle`: `Uint8Array | [number, number, number] | number[]` — A 3-byte sequence to locate.
+- Returns:
+  - In Node.js / Bun / Deno: `number | null` (synchronous 0-based byte index, or `null` if not found).
+  - In Browser / WebWorker: `Promise<number | null>` (resolves to 0-based byte index, or `null` if not found).
+
+### `searchN(haystack, needle)`
+
+```ts
+function searchN(
+  haystack: Uint8Array,
+  needle: Uint8Array | number[],
+): number | null | Promise<number | null>;
+```
+
+Searches for the first occurrence of an arbitrary byte sequence `needle` within `haystack`.
+
+- Parameters:
+  - `haystack`: `Uint8Array` / `Buffer` — The byte sequence to search.
+  - `needle`: `Uint8Array | number[]` — An arbitrary byte sequence to locate.
 - Returns:
   - In Node.js / Bun / Deno: `number | null` (synchronous 0-based byte index, or `null` if not found).
   - In Browser / WebWorker: `Promise<number | null>` (resolves to 0-based byte index, or `null` if not found).
