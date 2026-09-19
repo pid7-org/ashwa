@@ -37,6 +37,11 @@ harness = false
 name = "n_throughput"
 harness = false
 
+[[bench]]
+name = "dram_read"
+harness = false
+
+
 [[example]]
 name = "one_ilp"
 
