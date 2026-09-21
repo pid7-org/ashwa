@@ -2,6 +2,20 @@
 //!
 //! ## Example
 //!
+//! ### `search`
+//!
+//! ```
+//! use ashwa::search;
+//!
+//! let haystack = b"The quick brown fox jumps over the lazy dog";
+//! assert_eq!(search(haystack, b""), Some(0));
+//! assert_eq!(search(haystack, b"f"), Some(0x10));
+//! assert_eq!(search(haystack, b"qu"), Some(0x04));
+//! assert_eq!(search(haystack, b"fox"), Some(0x10));
+//! assert_eq!(search(haystack, b"lazy dog"), Some(0x23));
+//! assert_eq!(search(haystack, b"!"), None);
+//! ```
+//!
 //! ### `search_one`
 //!
 //! ```
@@ -66,11 +80,13 @@ use core::{arch::x86_64, sync::atomic};
 mod common;
 mod n;
 mod one;
+mod search;
 mod three;
 mod two;
 
 pub use n::search_n;
 pub use one::search_one;
+pub use search::search;
 pub use three::search_three;
 pub use two::search_two;
 
