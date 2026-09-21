@@ -103,22 +103,131 @@ unsafe fn search_one_avx2(haystack: &[u8], needle: u8) -> Option<usize> {
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
-    while i + 0x40 <= len {
-        let v1 = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
-        let v2 = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+    while i + 0x100 <= len {
+        let v0 = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v1 = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+        let v2 = _mm256_loadu_si256(ptr.add(i + 0x40) as *const __m256i);
+        let v3 = _mm256_loadu_si256(ptr.add(i + 0x60) as *const __m256i);
+        let v4 = _mm256_loadu_si256(ptr.add(i + 0x80) as *const __m256i);
+        let v5 = _mm256_loadu_si256(ptr.add(i + 0xA0) as *const __m256i);
+        let v6 = _mm256_loadu_si256(ptr.add(i + 0xC0) as *const __m256i);
+        let v7 = _mm256_loadu_si256(ptr.add(i + 0xE0) as *const __m256i);
 
+        let eq0 = _mm256_cmpeq_epi8(v0, v_needle);
         let eq1 = _mm256_cmpeq_epi8(v1, v_needle);
         let eq2 = _mm256_cmpeq_epi8(v2, v_needle);
+        let eq3 = _mm256_cmpeq_epi8(v3, v_needle);
+        let eq4 = _mm256_cmpeq_epi8(v4, v_needle);
+        let eq5 = _mm256_cmpeq_epi8(v5, v_needle);
+        let eq6 = _mm256_cmpeq_epi8(v6, v_needle);
+        let eq7 = _mm256_cmpeq_epi8(v7, v_needle);
 
-        let or_vec = _mm256_or_si256(eq1, eq2);
-        if _mm256_movemask_epi8(or_vec) != 0 {
+        let or01 = _mm256_or_si256(eq0, eq1);
+        let or23 = _mm256_or_si256(eq2, eq3);
+        let or45 = _mm256_or_si256(eq4, eq5);
+        let or67 = _mm256_or_si256(eq6, eq7);
+
+        let or0123 = _mm256_or_si256(or01, or23);
+        let or4567 = _mm256_or_si256(or45, or67);
+        let or_all = _mm256_or_si256(or0123, or4567);
+
+        if _mm256_movemask_epi8(or_all) != 0 {
+            if _mm256_movemask_epi8(or0123) != 0 {
+                let m0 = _mm256_movemask_epi8(eq0);
+                if m0 != 0 {
+                    return Some(i + m0.trailing_zeros() as usize);
+                }
+
+                let m1 = _mm256_movemask_epi8(eq1);
+                if m1 != 0 {
+                    return Some(i + 0x20 + m1.trailing_zeros() as usize);
+                }
+
+                let m2 = _mm256_movemask_epi8(eq2);
+                if m2 != 0 {
+                    return Some(i + 0x40 + m2.trailing_zeros() as usize);
+                }
+
+                let m3 = _mm256_movemask_epi8(eq3);
+                return Some(i + 0x60 + m3.trailing_zeros() as usize);
+            } else {
+                let m4 = _mm256_movemask_epi8(eq4);
+                if m4 != 0 {
+                    return Some(i + 0x80 + m4.trailing_zeros() as usize);
+                }
+
+                let m5 = _mm256_movemask_epi8(eq5);
+                if m5 != 0 {
+                    return Some(i + 0xA0 + m5.trailing_zeros() as usize);
+                }
+
+                let m6 = _mm256_movemask_epi8(eq6);
+                if m6 != 0 {
+                    return Some(i + 0xC0 + m6.trailing_zeros() as usize);
+                }
+
+                let m7 = _mm256_movemask_epi8(eq7);
+                return Some(i + 0xE0 + m7.trailing_zeros() as usize);
+            }
+        }
+
+        i += 0x100;
+    }
+
+    if i + 0x80 <= len {
+        let v0 = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v1 = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+        let v2 = _mm256_loadu_si256(ptr.add(i + 0x40) as *const __m256i);
+        let v3 = _mm256_loadu_si256(ptr.add(i + 0x60) as *const __m256i);
+
+        let eq0 = _mm256_cmpeq_epi8(v0, v_needle);
+        let eq1 = _mm256_cmpeq_epi8(v1, v_needle);
+        let eq2 = _mm256_cmpeq_epi8(v2, v_needle);
+        let eq3 = _mm256_cmpeq_epi8(v3, v_needle);
+
+        let or01 = _mm256_or_si256(eq0, eq1);
+        let or23 = _mm256_or_si256(eq2, eq3);
+        let or_all = _mm256_or_si256(or01, or23);
+
+        if _mm256_movemask_epi8(or_all) != 0 {
+            let m0 = _mm256_movemask_epi8(eq0);
+            if m0 != 0 {
+                return Some(i + m0.trailing_zeros() as usize);
+            }
+
             let m1 = _mm256_movemask_epi8(eq1);
             if m1 != 0 {
-                return Some(i + m1.trailing_zeros() as usize);
+                return Some(i + 0x20 + m1.trailing_zeros() as usize);
             }
 
             let m2 = _mm256_movemask_epi8(eq2);
-            return Some(i + 0x20 + m2.trailing_zeros() as usize);
+            if m2 != 0 {
+                return Some(i + 0x40 + m2.trailing_zeros() as usize);
+            }
+
+            let m3 = _mm256_movemask_epi8(eq3);
+            return Some(i + 0x60 + m3.trailing_zeros() as usize);
+        }
+
+        i += 0x80;
+    }
+
+    if i + 0x40 <= len {
+        let v0 = _mm256_loadu_si256(ptr.add(i) as *const __m256i);
+        let v1 = _mm256_loadu_si256(ptr.add(i + 0x20) as *const __m256i);
+
+        let eq0 = _mm256_cmpeq_epi8(v0, v_needle);
+        let eq1 = _mm256_cmpeq_epi8(v1, v_needle);
+
+        let or_vec = _mm256_or_si256(eq0, eq1);
+        if _mm256_movemask_epi8(or_vec) != 0 {
+            let m0 = _mm256_movemask_epi8(eq0);
+            if m0 != 0 {
+                return Some(i + m0.trailing_zeros() as usize);
+            }
+
+            let m1 = _mm256_movemask_epi8(eq1);
+            return Some(i + 0x20 + m1.trailing_zeros() as usize);
         }
 
         i += 0x40;
@@ -148,39 +257,110 @@ unsafe fn search_one_sse2(haystack: &[u8], needle: u8) -> Option<usize> {
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
-    while i + 0x40 <= len {
-        let v1 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
-        let v2 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
-        let v3 = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
-        let v4 = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+    while i + 0x80 <= len {
+        let v0 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v1 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v2 = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v3 = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+        let v4 = _mm_loadu_si128(ptr.add(i + 0x40) as *const __m128i);
+        let v5 = _mm_loadu_si128(ptr.add(i + 0x50) as *const __m128i);
+        let v6 = _mm_loadu_si128(ptr.add(i + 0x60) as *const __m128i);
+        let v7 = _mm_loadu_si128(ptr.add(i + 0x70) as *const __m128i);
 
+        let eq0 = _mm_cmpeq_epi8(v0, v_needle);
         let eq1 = _mm_cmpeq_epi8(v1, v_needle);
         let eq2 = _mm_cmpeq_epi8(v2, v_needle);
         let eq3 = _mm_cmpeq_epi8(v3, v_needle);
         let eq4 = _mm_cmpeq_epi8(v4, v_needle);
+        let eq5 = _mm_cmpeq_epi8(v5, v_needle);
+        let eq6 = _mm_cmpeq_epi8(v6, v_needle);
+        let eq7 = _mm_cmpeq_epi8(v7, v_needle);
 
-        let or1 = _mm_or_si128(eq1, eq2);
-        let or2 = _mm_or_si128(eq3, eq4);
-        let or_vec = _mm_or_si128(or1, or2);
+        let or01 = _mm_or_si128(eq0, eq1);
+        let or23 = _mm_or_si128(eq2, eq3);
+        let or45 = _mm_or_si128(eq4, eq5);
+        let or67 = _mm_or_si128(eq6, eq7);
+
+        let or0123 = _mm_or_si128(or01, or23);
+        let or4567 = _mm_or_si128(or45, or67);
+        let or_all = _mm_or_si128(or0123, or4567);
+
+        if _mm_movemask_epi8(or_all) != 0 {
+            if _mm_movemask_epi8(or0123) != 0 {
+                let m0 = _mm_movemask_epi8(eq0);
+                if m0 != 0 {
+                    return Some(i + m0.trailing_zeros() as usize);
+                }
+
+                let m1 = _mm_movemask_epi8(eq1);
+                if m1 != 0 {
+                    return Some(i + 0x10 + m1.trailing_zeros() as usize);
+                }
+
+                let m2 = _mm_movemask_epi8(eq2);
+                if m2 != 0 {
+                    return Some(i + 0x20 + m2.trailing_zeros() as usize);
+                }
+
+                let m3 = _mm_movemask_epi8(eq3);
+                return Some(i + 0x30 + m3.trailing_zeros() as usize);
+            } else {
+                let m4 = _mm_movemask_epi8(eq4);
+                if m4 != 0 {
+                    return Some(i + 0x40 + m4.trailing_zeros() as usize);
+                }
+
+                let m5 = _mm_movemask_epi8(eq5);
+                if m5 != 0 {
+                    return Some(i + 0x50 + m5.trailing_zeros() as usize);
+                }
+
+                let m6 = _mm_movemask_epi8(eq6);
+                if m6 != 0 {
+                    return Some(i + 0x60 + m6.trailing_zeros() as usize);
+                }
+
+                let m7 = _mm_movemask_epi8(eq7);
+                return Some(i + 0x70 + m7.trailing_zeros() as usize);
+            }
+        }
+
+        i += 0x80;
+    }
+
+    if i + 0x40 <= len {
+        let v0 = _mm_loadu_si128(ptr.add(i) as *const __m128i);
+        let v1 = _mm_loadu_si128(ptr.add(i + 0x10) as *const __m128i);
+        let v2 = _mm_loadu_si128(ptr.add(i + 0x20) as *const __m128i);
+        let v3 = _mm_loadu_si128(ptr.add(i + 0x30) as *const __m128i);
+
+        let eq0 = _mm_cmpeq_epi8(v0, v_needle);
+        let eq1 = _mm_cmpeq_epi8(v1, v_needle);
+        let eq2 = _mm_cmpeq_epi8(v2, v_needle);
+        let eq3 = _mm_cmpeq_epi8(v3, v_needle);
+
+        let or01 = _mm_or_si128(eq0, eq1);
+        let or23 = _mm_or_si128(eq2, eq3);
+        let or_vec = _mm_or_si128(or01, or23);
 
         if _mm_movemask_epi8(or_vec) != 0 {
+            let m0 = _mm_movemask_epi8(eq0);
+            if m0 != 0 {
+                return Some(i + m0.trailing_zeros() as usize);
+            }
+
             let m1 = _mm_movemask_epi8(eq1);
             if m1 != 0 {
-                return Some(i + m1.trailing_zeros() as usize);
+                return Some(i + 0x10 + m1.trailing_zeros() as usize);
             }
 
             let m2 = _mm_movemask_epi8(eq2);
             if m2 != 0 {
-                return Some(i + 0x10 + m2.trailing_zeros() as usize);
+                return Some(i + 0x20 + m2.trailing_zeros() as usize);
             }
 
             let m3 = _mm_movemask_epi8(eq3);
-            if m3 != 0 {
-                return Some(i + 0x20 + m3.trailing_zeros() as usize);
-            }
-
-            let m4 = _mm_movemask_epi8(eq4);
-            return Some(i + 0x30 + m4.trailing_zeros() as usize);
+            return Some(i + 0x30 + m3.trailing_zeros() as usize);
         }
 
         i += 0x40;
@@ -210,19 +390,49 @@ unsafe fn search_one_avx512(haystack: &[u8], needle: u8) -> Option<usize> {
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
-    while i + 0x80 <= len {
-        let v1 = _mm512_loadu_si512(ptr.add(i) as *const _);
-        let v2 = _mm512_loadu_si512(ptr.add(i + 0x40) as *const _);
+    while i + 0x100 <= len {
+        let v0 = _mm512_loadu_si512(ptr.add(i) as *const _);
+        let v1 = _mm512_loadu_si512(ptr.add(i + 0x40) as *const _);
+        let v2 = _mm512_loadu_si512(ptr.add(i + 0x80) as *const _);
+        let v3 = _mm512_loadu_si512(ptr.add(i + 0xC0) as *const _);
 
+        let eq0 = _mm512_cmpeq_epi8_mask(v0, v_needle);
         let eq1 = _mm512_cmpeq_epi8_mask(v1, v_needle);
         let eq2 = _mm512_cmpeq_epi8_mask(v2, v_needle);
+        let eq3 = _mm512_cmpeq_epi8_mask(v3, v_needle);
 
-        if eq1 != 0 {
-            return Some(i + eq1.trailing_zeros() as usize);
+        if (eq0 | eq1 | eq2 | eq3) != 0 {
+            if eq0 != 0 {
+                return Some(i + eq0.trailing_zeros() as usize);
+            }
+
+            if eq1 != 0 {
+                return Some(i + 0x40 + eq1.trailing_zeros() as usize);
+            }
+
+            if eq2 != 0 {
+                return Some(i + 0x80 + eq2.trailing_zeros() as usize);
+            }
+
+            return Some(i + 0xC0 + eq3.trailing_zeros() as usize);
         }
 
-        if eq2 != 0 {
-            return Some(i + 0x40 + eq2.trailing_zeros() as usize);
+        i += 0x100;
+    }
+
+    if i + 0x80 <= len {
+        let v0 = _mm512_loadu_si512(ptr.add(i) as *const _);
+        let v1 = _mm512_loadu_si512(ptr.add(i + 0x40) as *const _);
+
+        let eq0 = _mm512_cmpeq_epi8_mask(v0, v_needle);
+        let eq1 = _mm512_cmpeq_epi8_mask(v1, v_needle);
+
+        if (eq0 | eq1) != 0 {
+            if eq0 != 0 {
+                return Some(i + eq0.trailing_zeros() as usize);
+            }
+
+            return Some(i + 0x40 + eq1.trailing_zeros() as usize);
         }
 
         i += 0x80;

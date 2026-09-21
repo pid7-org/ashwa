@@ -101,31 +101,76 @@ pub(crate) fn search_one_swar64(haystack: &[u8], needle: u8) -> Option<usize> {
     let len = haystack.len();
     let ptr = haystack.as_ptr();
 
-    while i + 0x20 <= len {
-        let w1 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
-        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
-        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
-        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
+    while i + 0x40 <= len {
+        let w0 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
+        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
+        let w4 = unsafe { ptr::read_unaligned(ptr.add(i + 0x20) as *const u64) };
+        let w5 = unsafe { ptr::read_unaligned(ptr.add(i + 0x28) as *const u64) };
+        let w6 = unsafe { ptr::read_unaligned(ptr.add(i + 0x30) as *const u64) };
+        let w7 = unsafe { ptr::read_unaligned(ptr.add(i + 0x38) as *const u64) };
 
+        let m0 = match_qword(w0, needle_qword);
         let m1 = match_qword(w1, needle_qword);
         let m2 = match_qword(w2, needle_qword);
         let m3 = match_qword(w3, needle_qword);
         let m4 = match_qword(w4, needle_qword);
+        let m5 = match_qword(w5, needle_qword);
+        let m6 = match_qword(w6, needle_qword);
+        let m7 = match_qword(w7, needle_qword);
 
-        if (m1 | m2 | m3 | m4) != 0 {
+        if (m0 | m1 | m2 | m3 | m4 | m5 | m6 | m7) != 0 {
+            if (m0 | m1 | m2 | m3) != 0 {
+                if m0 != 0 {
+                    return Some(i + get_match_index_64(m0));
+                }
+                if m1 != 0 {
+                    return Some(i + 8 + get_match_index_64(m1));
+                }
+                if m2 != 0 {
+                    return Some(i + 0x10 + get_match_index_64(m2));
+                }
+                return Some(i + 0x18 + get_match_index_64(m3));
+            } else {
+                if m4 != 0 {
+                    return Some(i + 0x20 + get_match_index_64(m4));
+                }
+                if m5 != 0 {
+                    return Some(i + 0x28 + get_match_index_64(m5));
+                }
+                if m6 != 0 {
+                    return Some(i + 0x30 + get_match_index_64(m6));
+                }
+                return Some(i + 0x38 + get_match_index_64(m7));
+            }
+        }
+
+        i += 0x40;
+    }
+
+    if i + 0x20 <= len {
+        let w0 = unsafe { ptr::read_unaligned(ptr.add(i) as *const u64) };
+        let w1 = unsafe { ptr::read_unaligned(ptr.add(i + 8) as *const u64) };
+        let w2 = unsafe { ptr::read_unaligned(ptr.add(i + 0x10) as *const u64) };
+        let w3 = unsafe { ptr::read_unaligned(ptr.add(i + 0x18) as *const u64) };
+
+        let m0 = match_qword(w0, needle_qword);
+        let m1 = match_qword(w1, needle_qword);
+        let m2 = match_qword(w2, needle_qword);
+        let m3 = match_qword(w3, needle_qword);
+
+        if (m0 | m1 | m2 | m3) != 0 {
+            if m0 != 0 {
+                return Some(i + get_match_index_64(m0));
+            }
             if m1 != 0 {
-                return Some(i + get_match_index_64(m1));
+                return Some(i + 8 + get_match_index_64(m1));
             }
-
             if m2 != 0 {
-                return Some(i + 8 + get_match_index_64(m2));
+                return Some(i + 0x10 + get_match_index_64(m2));
             }
-
-            if m3 != 0 {
-                return Some(i + 0x10 + get_match_index_64(m3));
-            }
-
-            return Some(i + 0x18 + get_match_index_64(m4));
+            return Some(i + 0x18 + get_match_index_64(m3));
         }
 
         i += 0x20;
